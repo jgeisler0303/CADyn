@@ -1,0 +1,517 @@
+/*
+ copyright (C) 2017 Jens Geisler
+*/
+
+cagem_dir: load_pathname;
+
+/* Procedure giving the homogeneous transformation matrix of the rotation about X-axis by an angle thetax. */
+Trotx(thetax):= block([Toi],
+     Toi: matrix([1, 0, 0, 0],[0, cos(thetax), -sin(thetax), 0],[0, sin(thetax), cos(thetax), 0],[0,0,0,1])
+);
+
+
+/* Procedure giving the homogeneous transformation matrix of the rotation about Y-axis by an angle thetay. */
+Troty(thetay):= block([Toi],
+     Toi: matrix([cos(thetay), 0, sin(thetay), 0],[0, 1, 0, 0],[-sin(thetay), 0, cos(thetay), 0],[0,0,0,1])
+);
+
+/* Procedure giving the homogeneous transformation matrix of the rotation about Z-axis by an angle thetaz. */
+Trotz(thetaz):= block([Toi],
+     Toi: matrix([cos(thetaz), -sin(thetaz), 0, 0],[sin(thetaz), cos(thetaz), 0, 0],[0, 0, 1, 0],[0,0,0,1])
+);
+
+
+/* Procedure giving the homogeneous transformation matrix of the rotation by an angle theta
+   about an arbitrary axis whose direction cosines are equal to nx, ny and nz. */
+Trotn(nx,ny,nz,theta):= block([Toi],
+     Toi: matrix([nx*nx*(1-cos(theta))+cos(theta), nx*ny*(1-cos(theta))-nz*sin(theta), nx*nz*(1-cos(theta))-ny*sin(theta), 0],[nx*ny*(1-cos(theta))+nz*sin(theta), ny*ny*(1-cos(theta))+cos(theta), ny*nz*(1-cos(theta))-nx*sin(theta), 0],[nx*nz*(1-cos(theta))-ny*sin(theta), nx*nz*(1-cos(theta))+nx*sin(theta), nz*nz*(1-cos(theta))+cos(theta), 0],[0,0,0,1])
+);
+
+/* Procedure giving the homogeneous transformation matrix of the displacement about its coordinates x, y and z. */
+Tdisp(x,y,z):= block([Toi],
+     Toi: matrix([1,0,0,x],[0,1,0,y],[0,0,1,z],[0,0,0,1])
+);
+
+decomp(expr):= block([], if atom(expr) or subvarp(expr) then [] else append([op(expr)],  map(decomp, args(expr))));
+exp_size(expr):= length(flatten(decomp(expr)));
+/* simplify(x):= radcan(trigreduce(trigsimp(x)));  ratsimp, trigrat ?? */
+/* simplify(x):= block([s0, s1, s2], s0: eval_string(string(ev(x, float))), s1: ratsimp(trigreduce(trigsimp(s0))), s2: ratsimp(trigsimp(s0)), if exp_size(s1)>exp_size(s2) then s2 else s1); */
+/* simplify(x):= block([s0, s1, s2, s3], s0: x, s1: ratsimp(trigreduce(trigsimp(s0))), s2: ratsimp(trigsimp(s0)), if exp_size(s1)>exp_size(s2) then s3: s2 else s3:s1, ev(s3, float)); */
+simplify(x):= block([s0, s1, s2, s3, s4], 
+    s0: trigsimp(x),
+    s1: ratsimp(trigreduce(s0)),
+    s2: ratsimp(s0),
+    if exp_size(s1)>exp_size(s2) then s3: s2 else s3:s1,
+    s4: ratsimp(ev(s3, float)),
+    if exp_size(s3)>exp_size(s4) then s4 else s3);
+
+do_assign(n_work, e_work):= block([],
+  gentran(lrsetq(eval(n_work), scanmap('float, e_work)))
+);
+
+/* CAGeM procedure */
+cagem(file, [target_dir]):= block([
+    time0, timeKI1, timeKI2, timeSP1, timeSP2, timeCPP, timePLT,
+    ssKI1, ssKI2, ssKI, ssSP1, ssSP2, ssSP, ssCPP, ssPLT,
+    timeTEXFR, ssTEXFR, timeTEXEN, ssTEXEN, timeTotal, ss, mm, seconds,
+    filePLT, fileTEXFR, fileTEXEN, fileCPP,
+    nbrbodymax, nbrdofmax, nbrdepmax, 
+    i, j, j_, k, k_, f, temp, phiG, pi, pdi, pddi, p, pd, pdd, q, nbr_relative, elastic_dof_idx, 
+    SIMPLIFY, INPUTS, 
+    title, mass, IG, gravity, T0G, TrefG, elastic_dof, ebody, BodyRef, T0Gd, R0G, R0Gd, MatRot, omega, omega_, omegad, vG, vG_, aG, nbrdof, nbrbody, nbrdep, vGpartial, omegapartial,
+    qi, qdi, Ixx, Iyy, Izz, Ixy, Ixz, Iyz], 
+    local(temp, phiG, mass, IG, gravity, T0G, TrefG, elastic_dof, ebody, BodyRef, T0Gd, R0G, R0Gd, MatRot, omega, omega_, omegad, vG, vG_, aG, vGpartial, omegapartial, qi, qdi, Ixx, Iyy, Izz, Ixy, Ixz, Iyz, pi, pdi, pddi, p, pd, pdd, q),
+
+
+    /* Program initialization. */
+    print("===================================================================="),
+    print("CAGeM v1.2.4"),
+    print("(\"Computed-Aided Generation of Motion\")"),
+    print("===================================================================="),
+
+
+    keepfloat: true,
+    ratprint: false,
+    load(file),
+    filepath: pathname_directory(file),
+    if length(target_dir)>0 then (
+        filepath: target_dir[1],
+        if slength(filepath)>0 then
+            if notequal(substring (filepath, slength(filepath), slength(filepath)+1),"/") then
+                filepath: sconcat(filepath, "/")
+    ),
+    filename: pathname_name(file),
+
+    /* Counter initialization. */
+    time0: elapsed_run_time(),
+
+    /* Option flags initialization. */
+    if SIMPLIFY='SIMPLIFY then SIMPLIFY: 1,
+    if INPUTS='INPUTS then INPUTS: 0,
+    if FinalTime='FinalTime then FinalTime: 10.0,
+    if StepSave='StepSave then StepSave: 0.01,
+    if StepMax='StepMax then StepMax: 0.01,
+    
+    if TrefG='TrefG then TrefG[0]: [],
+    if elastic_dof='elastic_dof then elastic_dof[0]: [],
+    if nbrbody='nbrbody then nbrbody: lmax(append(flatten(rest(arrayinfo(T0G), 2)), flatten(rest(arrayinfo(TrefG), 2)))),
+    if nbrdof='nbrdof then nbrdof: max(lmax(flatten(map(args, sublist(listofvars([listarray(T0G), listarray(TrefG), listarray(elastic_dof)]), lambda([x], subvarp(x) and op(x)='q))))), 0),
+    if nbrdep='nbrdep then if member('pi, arrays) then nbrdep: lmax(flatten(rest(arrayinfo(pi), 2))) else nbrdep: 0,
+    if gravity='gravity then gravity: [0.0, 0.0, -9.81],
+    nbrin: INPUTS,
+            
+    IG: makelist(zeromatrix(3, 3), i, 1, nbrbody),
+    for i:1 thru nbrbody do (
+        if member('Ixx, arrays) and member(i, flatten(rest(arrayinfo(Ixx), 2))) then IG[i][1, 1]: Ixx[i],
+        if member('Iyy, arrays) and member(i, flatten(rest(arrayinfo(Iyy), 2))) then IG[i][2, 2]: Iyy[i],
+        if member('Izz, arrays) and member(i, flatten(rest(arrayinfo(Izz), 2))) then IG[i][3, 3]: Izz[i],
+        if member('Ixy, arrays) and member(i, flatten(rest(arrayinfo(Ixy), 2))) then (IG[i][1, 2]: Ixy[i], IG[i][2, 1]: Ixy[i]),
+        if member('Ixz, arrays) and member(i, flatten(rest(arrayinfo(Ixz), 2))) then (IG[i][1, 3]: Ixz[i], IG[i][3, 1]: Ixz[i]),
+        if member('Iyz, arrays) and member(i, flatten(rest(arrayinfo(Iyz), 2))) then (IG[i][2, 3]: Iyz[i], IG[i][3, 2]: Iyz[i])
+    ),
+    for i:1 thru nbrdof do (
+        if not(member('qi, arrays)) or not(member(i, flatten(rest(arrayinfo(qi), 2)))) then qi[i]: 0.0,
+        if not(member('qdi, arrays)) or not(member(i, flatten(rest(arrayinfo(qdi), 2)))) then qdi[i]: 0.0
+    ),
+    
+    nbr_relative: 0,
+    zero_matrix:  zeromatrix(4, 4),
+    for i:1 thru nbrbody do (
+        if not(member(i, flatten(rest(arrayinfo(T0G), 2)))) or (T0G[i] = zero_matrix and BodyRef[i] # -1) then (
+            index_relative[i]: 1,
+            T0G[i]: TrefG[i],
+            nbr_relative: nbr_relative+1
+        ) else (
+            index_relative[i]: 0
+        ),
+        if member(i, flatten(rest(arrayinfo(elastic_dof), 2))) then (
+            elastic_dof[i]: sublist(elastic_dof[i], lambda([x], subvarp(x) and op(x)='q)),
+            elastic_dof_idx[i]: flatten(map(args, elastic_dof[i]))
+        ) else
+            elastic_dof_idx[i]: [],
+            
+        T0G[i]: float(T0G[i])
+    ),
+
+    printf(true, "Generating for system with ~d bodies (~d relative), ~d degrees of freedom, ~d dependent variables.~%", nbrbody, nbr_relative, nbrdof, nbrdep),
+    
+    print("Declaration of dependant variables"),
+    /* Declaration of dependant variables. 
+    for k: 1 thru nbrdep do
+        depends(pi[k], t),*/
+    depends(p, t),
+    
+
+    print("Creation of time dependence."),
+    /* Creation of time dependence.
+    for i: 1 thru nbrdof do
+        depends(q[i], t),*/
+    depends(q, t),
+    
+    print("Calculed kinematics (part one)."),
+    /* Calculed kinematics (part one). */
+    for i: 1 thru nbrbody do (
+        T0Gd[i]: diff(T0G[i], t),
+        vG[i]: submatrix(4, T0Gd[i], 1, 2, 3),
+        R0G[i]: submatrix(4, T0G[i], 4),
+        R0Gd[i]: submatrix(4, T0Gd[i], 4),
+        MatRot[i]: R0Gd[i].transpose(R0G[i]),
+        omega[i]: matrix([MatRot[i][3,2]], [MatRot[i][1,3]], [MatRot[i][2,1]])
+    ),
+
+    for k:1 thru nbrdep do
+        pdi[k]: diff(pi[k],t),
+    
+    timeKI1: elapsed_run_time(),
+    ssKI1: trunc(timeKI1-time0),
+
+    print("Simplification of kinematics parameters (part one)"),
+    /* Simplification of kinematics parameters (part one). */
+    if SIMPLIFY=1 then (
+        for i:1 thru nbrbody do (
+            T0G[i]: simplify(T0G[i]),
+            T0Gd[i]: simplify(T0Gd[i]),
+            vG[i]: simplify(vG[i]),
+            omega[i]: simplify(omega[i])
+        ),
+        
+        for k: 1 thru nbrdep do
+            pi[k]: simplify(pi[k]),
+            pdi[k]: simplify(pdi[k])
+    ),
+    
+    timeSP1: elapsed_run_time(),
+    ssSP1: trunc(timeSP1-timeKI1),
+
+    print("Complete calculed kinematics (part two)"),
+    /* Complete calculed kinematics (part two). */
+    for i:1 thru nbrbody do (
+        aG[i]: diff(vG[i], t),
+        omegad[i]: diff(omega[i], t)
+    ),
+    
+    for k:1 thru nbrdep do
+        pddi[k]: diff(pdi[k], t),
+
+    timeKI2: elapsed_run_time(),
+    ssKI2: trunc(timeKI2-timeSP1),
+
+    print("Simplification of kinematics parameters (part two)"),
+    /* Simplification of kinematics parameters (part two). */
+    if SIMPLIFY=1 then (
+        for i:1 thru nbrbody do (
+            aG[i]: simplify(aG[i]),
+            omegad[i]: simplify(omegad[i])
+        ),
+        for k:1 thru nbrdep do
+            pddi[k]: simplify(pddi[k])
+    ),
+    
+    timeSP2: elapsed_run_time(),
+    ssSP2: trunc(timeSP2-timeKI2),
+
+    
+    print("Form modification of configuration parameters"),
+    /* Form modification of configuration parameters. */
+    /* TODO may be handled more elegantly by gradef */
+    for i:1 thru nbrbody do (
+        for j:1 thru nbrdof do (
+            j_: j-1,
+            vG[i]: subst(qdd[j_], diff(q[j],t,2), vG[i]),
+            vG[i]: subst(qd[j_], diff(q[j],t), vG[i]),
+            vG[i]: subst(q[j_], q[j], vG[i]),
+            omega[i]: subst(qdd[j_], diff(q[j],t,2), omega[i]),
+            omega[i]: subst(qd[j_], diff(q[j],t), omega[i]),
+            omega[i]: subst(q[j_], q[j], omega[i]),
+            aG[i]: subst(qdd[j_], diff(q[j],t,2), aG[i]),
+            aG[i]: subst(qd[j_], diff(q[j],t), aG[i]),
+            aG[i]: subst(q[j_], q[j], aG[i]),
+            omegad[i]: subst(qdd[j_], diff(q[j],t,2), omegad[i]),
+            omegad[i]: subst(qd[j_], diff(q[j],t), omegad[i]),
+            omegad[i]: subst(q[j_], q[j], omegad[i]),
+            T0G[i]: subst(qdd[j_], diff(q[j],t,2), T0G[i]),
+            T0G[i]: subst(qd[j_], diff(q[j],t), T0G[i]),
+            T0G[i]: subst(q[j_], q[j], T0G[i]),
+            T0Gd[i]: subst(qdd[j_], diff(q[j],t,2), T0Gd[i]),
+            T0Gd[i]: subst(qd[j_], diff(q[j],t), T0Gd[i]),
+            T0Gd[i]: subst(q[j_], q[j], T0Gd[i])
+        ),
+        for j:1 thru nbrdep do (
+            j_: j-1,
+            vG[i]: subst(pdd[j_], diff(p[j],t,2), vG[i]),
+            vG[i]: subst(pd[j_], diff(p[j],t), vG[i]),
+            vG[i]: subst(p[j_], p[j], vG[i]),
+            omega[i]: subst(pdd[j_], diff(p[j],t,2), omega[i]),
+            omega[i]: subst(pd[j_], diff(p[j],t), omega[i]),
+            omega[i]: subst(p[j_], p[j], omega[i]),
+            aG[i]: subst(pdd[j_], diff(p[j],t,2), aG[i]),
+            aG[i]: subst(pd[j_], diff(p[j],t), aG[i]),
+            aG[i]: subst(p[j_], p[j], aG[i]),
+            omegad[i]: subst(pdd[j_], diff(p[j],t,2), omegad[i]),
+            omegad[i]: subst(pd[j_], diff(p[j],t), omegad[i]),
+            omegad[i]: subst(p[j_], p[j], omegad[i]),
+            T0G[i]: subst(pdd[j_], diff(p[j],t,2), T0G[i]),
+            T0G[i]: subst(pd[j_], diff(p[j],t), T0G[i]),
+            T0G[i]: subst(p[j_], p[j], T0G[i]),
+            T0Gd[i]: subst(pdd[j_], diff(p[j],t,2), T0Gd[i]),
+            T0Gd[i]: subst(pd[j_], diff(p[j],t), T0Gd[i]),
+            T0Gd[i]: subst(p[j_], p[j], T0Gd[i])
+        )
+    ),
+    for k:1 thru nbrdep do (
+        for j:1 thru nbrdof do (
+            j_: j-1,
+            pi[k]: subst(q[j_], q[j], pi[k]),
+            pdi[k]: subst(qd[j_], diff(q[j],t), pdi[k]),
+            pdi[k]: subst(q[j_], q[j], pdi[k]),
+            pddi[k]: subst(qdd[j_], diff(q[j],t, 2), pddi[k]),
+            pddi[k]: subst(qd[j_], diff(q[j],t), pddi[k]),
+            pddi[k]: subst(q[j_], q[j], pddi[k])
+        ),
+        for j:1 thru nbrdep do (
+            j_: j-1,
+            pi[k]: subst(p[j_], p[j], pi[k]),
+            pdi[k]: subst(pd[j_], diff(p[j],t), pdi[k]),
+            pdi[k]: subst(p[j_], p[j], pdi[k]),
+            pddi[k]: subst(pdd[j_], diff(p[j],t, 2), pddi[k]),
+            pddi[k]: subst(pd[j_], diff(p[j],t), pddi[k]),
+            pddi[k]: subst(p[j_], p[j], pddi[k])
+        )
+    ),
+
+    print("Complete calculed kinematics (part three)"),
+    /* Complete calculed kinematics (part three). */
+    vGpartial_p: zeromatrix(3,1),
+    omegapartial_p: zeromatrix(3,1),
+    for i:1 thru nbrbody do (
+        for j:1 thru nbrdof do (
+            j_: j-1,
+            vG_: vG[i],
+            omega_: omega[i],
+            for k: nbrdep step -1 thru 1 do (
+                k_: k-1,
+                vG_: subst(pdi[k], pd[k_], vG_),
+                vG_: subst(pi[k], p[k_], vG_),
+                omega_: subst(pdi[k], pd[k_], omega_),
+                omega_: subst(pi[k], p[k_], omega_)
+            ),
+            
+            vGpartial[i, j]: diff(vG_, qd[j_]),
+            omegapartial[i, j]: diff(omega_, qd[j_])
+        )
+    ),
+    
+    timeKI3: elapsed_run_time(),
+    SSKI3: trunc(timeKI3-timeSP2),
+    ssKI: ssKI1+ssKI2+SSKI3,
+    printf(true, "... Kinematics computation finished ~,3h s.~%", ssKI),
+                
+    print("Simplification of kinematics parameters (part three)"),
+    /* Simplification of kinematics parameters (part three). */
+    if SIMPLIFY = 1 then (
+        for i:1 thru nbrbody do (
+            for j:1 thru nbrdof do (
+                vGpartial[i,j]: simplify(vGpartial[i,j]),
+                omegapartial[i,j]: simplify(omegapartial[i,j])
+            )
+        )
+    ),
+    
+    timeSP3: elapsed_run_time(),
+    ssSP3: trunc(timeSP3-timeKI3),
+    ssSP: ssSP1+ssSP2+ssSP3, 
+    printf(true, "... Kinematics simplification finished in ~,3h s.~%", ssSP),
+    
+    /*load("operatingsystem"),
+    mkdir(filepath),*/
+    
+    load("gentran"),
+    gentranlang(c),
+    on('float),
+    off('gentranseg),
+    ?clinelen\*: 1000,            
+    gentranin(filename_merge(cagem_dir, "cadyn_cpp.tem"), [openw(sconcat(filepath, filename, "System.hpp"))]),
+    app_file: sconcat(filepath, filename, "_app.cpp"),
+    user_file: sconcat(filename, ".AppEff.hpp"),
+    if file_search(app_file)=false then
+        gentranin(filename_merge(cagem_dir, "cadyn_cpp_app.tem"), [openw(app_file)]),
+
+    
+    /* CPU-time of the complete C++ file writing. */
+    timeCPP:elapsed_run_time(),
+    if SIMPLIFY=1 then
+        ssCPP:trunc(timeCPP-timeSP3)
+    else (
+        ssCPP:trunc(timeCPP-timeKI3),
+        ssSP:0
+    ),
+    
+    printf(true, "... Writing in C++ file finished in ~,3h s.~%", ssCPP),
+
+    /* Total CPU-time. */
+    timeTotal: elapsed_run_time(),
+    ss: timeTotal-time0,
+    mm: floor(ss/60),
+    totseconds:trunc(ss-mm*60),
+    printf(true, "All the operations are finished. Total CPU-time in Maxima: ~d:~6,3,,,,'0h min.~%", mm, totseconds),
+    
+    done
+);
+
+
+cross(a, b):= [
+    a[2]*b[3]-a[3]*b[2],
+    a[3]*b[1]-a[1]*b[3],
+    a[1]*b[2]-a[2]*b[1]
+];
+
+crossmat(x):= matrix([0, -x[3], x[2]], [x[3], 0, -x[1]], [-x[2], x[1], 0]);
+
+calcElasticModeLumpedPrecomputed(PHI, rr, mm):= block([b, i, iPHI, jPHI, md, Ct, Cr, Me, Mee, Gr, Oe, Ge, Gee], 
+    defstruct(ebody (m, I, md, Ct, Cr, Me, Gr, Oe, Ge, K, D)),
+    b: new(ebody),
+    
+    m: 0,
+    for i:1 thru length(PHI[1]) do (
+        m: m + mm[i]
+    ),
+    b@m: m,
+    
+    I: zeromatrix(3, 3),
+    for i:1 thru length(PHI[1]) do (
+        I: I - crossmat(rr[i]).crossmat(rr[i])*mm[i]
+    ),
+    b@I: I,
+    
+    md: [0, 0, 0],
+    for i:1 thru length(PHI[1]) do (
+        md: md + rr[i]*mm[i]
+    ),
+    b@md: md,
+    
+    b@Ct: [],
+    for iPHI:1 thru length(PHI) do (
+        Ct: [0, 0, 0],
+        for i:1 thru length(PHI[1]) do (
+            Ct: Ct + PHI[iPHI][i]*mm[i]
+        ),
+        b@Ct: endcons(Ct, b@Ct)
+    ),
+
+    b@Cr: [],
+    for iPHI:1 thru length(PHI) do (
+        Cr: [0, 0, 0],
+        for i:1 thru length(PHI[1]) do (
+            Cr: Cr + cross(rr[i], PHI[iPHI][i])*mm[i]
+        ),
+        b@Cr: endcons(Cr, b@Cr)
+    ),
+
+    b@Me: [],
+    for iPHI:1 thru length(PHI) do (
+        Mee: [],
+        for jPHI:1 thru length(PHI) do (
+            Me: 0,
+            for i: 1 thru length(PHI[1]) do
+                Me: Me + apply("+", PHI[iPHI][i]*PHI[jPHI][i])*mm[i],
+            Mee: endcons(Me, Mee)
+        ),
+        b@Me: endcons(Mee, b@Me)
+    ),
+    
+    b@Gr: [],
+    for iPHI:1 thru length(PHI) do (
+        Gr: zeromatrix(3, 3),
+        for i:1 thru length(PHI[1]) do (
+            Gr: Gr + 2*transpose(crossmat(rr[i])).crossmat(PHI[iPHI][i])*mm[i]
+        ),
+        b@Gr: endcons(Gr, b@Gr)
+    ),
+        
+    b@Ge: [],
+    for iPHI:1 thru length(PHI) do (
+        Gee: [],
+        for jPHI:1 thru length(PHI) do (
+            Ge: [0, 0, 0],
+            for i: 1 thru length(PHI[1]) do
+                Ge: Ge - 2*cross(PHI[iPHI][i], PHI[jPHI][i])*mm[i],
+            Gee: endcons(Ge, Gee)
+        ),
+        b@Ge: endcons(Gee, b@Ge)
+    ),
+    
+    b@Oe: [],
+    for iPHI:1 thru length(PHI) do (
+        Oe: makelist(0, i, 1, 6),
+        for i:1 thru length(PHI[1]) do (
+            Oe[1]: Oe[1]-(rr[i][3]*PHI[iPHI][i][3] + rr[i][2]*PHI[iPHI][i][2]) * mm[i], /* wx^2 */
+            Oe[2]: Oe[2]-(rr[i][3]*PHI[iPHI][i][3] + rr[i][1]*PHI[iPHI][i][1]) * mm[i], /* wy^2 */
+            Oe[3]: Oe[3]-(rr[i][2]*PHI[iPHI][i][2] + rr[i][1]*PHI[iPHI][i][1]) * mm[i], /* wz^2 */
+            Oe[4]: Oe[4]+(rr[i][1]*PHI[iPHI][i][2] + rr[i][2]*PHI[iPHI][i][1]) * mm[i], /* wx*wy */
+            Oe[5]: Oe[5]+(rr[i][2]*PHI[iPHI][i][3] + rr[i][3]*PHI[iPHI][i][2]) * mm[i], /* wy*wz */
+            Oe[6]: Oe[6]+(rr[i][1]*PHI[iPHI][i][3] + rr[i][3]*PHI[iPHI][i][1]) * mm[i]  /* wx*wz */
+        ),
+        b@Oe: endcons(Oe, b@Oe)
+    ),
+    b
+);
+
+emptyElasticModeLumpedPrecomputed(nedof):= block([b, i, iPHI, jPHI, md, Ct, Cr, Me, Mee, Gr, Oe, Ge, Gee], 
+    defstruct(ebody (m, I, md, Ct, Cr, Me, Gr, Oe, Ge, K, D)),
+    b: new(ebody),
+    
+    m: 0,
+    b@m: m,
+    
+    I: zeromatrix(3, 3),
+    b@I: I,
+    
+    md: [0, 0, 0],
+    b@md: md,
+    
+    b@Ct: [],
+    Ct: [0, 0, 0],
+    for iPHI:1 thru nedof do (
+        b@Ct: endcons(Ct, b@Ct)
+    ),
+
+    b@Cr: [],
+    Cr: [0, 0, 0],
+    for iPHI:1 thru nedof do (
+        b@Cr: endcons(Cr, b@Cr)
+    ),
+
+    b@Me: [],
+    for iPHI:1 thru nedof do (
+        Mee: [],
+        for jPHI:1 thru nedof do (
+            Me: 0,
+            Mee: endcons(Me, Mee)
+        ),
+        b@Me: endcons(Mee, b@Me)
+    ),
+    
+    b@Gr: [],
+    for iPHI:1 thru nedof do (
+        Gr: zeromatrix(3, 3),
+        b@Gr: endcons(Gr, b@Gr)
+    ),
+        
+    b@Ge: [],
+    for iPHI:1 thru nedof do (
+        Gee: [],
+        for jPHI:1 thru nedof do (
+            Ge: [0, 0, 0],
+            Gee: endcons(Ge, Gee)
+        ),
+        b@Ge: endcons(Gee, b@Ge)
+    ),
+    
+    b@Oe: [],
+    Oe: makelist(0, i, 1, 6),
+    for iPHI:1 thru nedof do (
+        b@Oe: endcons(Oe, b@Oe)
+    ),
+
+    b
+);

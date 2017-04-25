@@ -1,0 +1,33 @@
+title: "Simulation of a pivoting elastic beam";
+
+/* Gravity vector */
+gravity[1]: -9.81;
+gravity[2]: 0;
+gravity[3]: 0;
+
+mass[1]: 1;
+Ixx[1]: 1;
+Iyy[1]: 1;
+Izz[1]: 1;
+T0G[1]:  Trotz(q[1]);
+
+elastic_dof[2]: [q[2]];
+PHI: [makelist([(0.1*i)^2, 0, 0], i, 1, 6)];
+rr: makelist([0, 0.1*i, 0], i, 1, 6);
+mm: makelist(0.1, i, 1, 6);
+ebody[2]: calcElasticModeLumpedPrecomputed(PHI, rr, mm);
+ebody[2]@K: [1];
+ebody[2]@D: [0.01];
+mass[2]: apply("+", mm);
+II: apply("+", mm*rr*rr);
+Ixx[2]: 1;
+Iyy[2]: 1;
+Izz[2]: II[2];
+BodyRef[2]: 1;
+TrefG[2]:  Tdisp(0, 0.1, 0);
+
+
+/* Simulation parameters */
+FinalTime: 20;
+StepSave: 0.05;
+StepMax: 0.01;

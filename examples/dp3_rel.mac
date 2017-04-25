@@ -1,0 +1,33 @@
+title:"Simulation of a double pendulum";
+
+/* Gravity vector*/
+gravity[1]:0;
+gravity[2]:-9.81;
+gravity[3]:0;
+
+/* Eventual constants*/
+l0:1.2;
+l1:1.1;
+
+/*  Inertia characteristics*/
+mass[1]:1.1;
+mass[2]:0.9;
+Ixx[1]:1;
+Ixx[2]:1;
+Iyy[1]:1;
+Iyy[2]:1;
+Izz[1]:l0^2/12*mass[1];
+Izz[2]:l1^2/12*mass[2];
+
+/*  Definition of the position matrices*/
+T0G[1] : Trotz(q[1]) . Tdisp(0,-l0/2,0);
+TrefG[2] : Tdisp(0,-l0/2,0) . Trotz(q[2]) . Tdisp(0,-l1/2,0);
+BodyRef[2]: 1;
+
+/*  Initial conditions*/
+qi[2]:1;
+
+/*  Simulation parameters*/
+FinalTime:5;
+StepSave:0.01;
+StepMax:0.005;

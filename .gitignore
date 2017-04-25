@@ -1,3 +1,11 @@
+examples/**/
+.directory
+.cproject
+.project
+.settings/
+
+*.d
+
 # Compiled Object files
 *.slo
 *.lo
