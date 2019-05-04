@@ -16,15 +16,12 @@ PHI: [makelist([0, (0.2*i)^2, 0], i, 1, 6), makelist([0, 0, (0.2*i)^2], i, 1, 6)
 rr: makelist([1*i, 0, 0], i, 1, 6);
 mm: makelist(0.1, i, 1, 6);
 ebody[2]: calcElasticModeLumpedPrecomputed(PHI, rr, mm);
-ebody[2]@K: [1, 1];
-ebody[2]@D: [0.01, 0.01];
-mass[2]: ebody[2]@m;
-Ixx[2]: 0.00001; /*ebody[2]@I[1, 1];*/
-Iyy[2]: ebody[2]@I[2, 2];
-Izz[2]: ebody[2]@I[3, 3];
-Ixy[2]: ebody[2]@I[1, 2];
-Ixz[2]: ebody[2]@I[1, 3];
-Iyz[2]: ebody[2]@I[2, 3];
+ebody[2]@K@M0[1, 1]: 1;
+ebody[2]@K@M0[2, 2]: 1;
+ebody[2]@D@M0[1, 1]: 0.01;
+ebody[2]@D@M0[2, 2]: 0.01;
+ebody[2]@I@M0[1, 1]: 0.00001;
+
 BodyRef[2]: 1;
 TrefG[2]:  Trotx(0);
 

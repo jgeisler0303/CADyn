@@ -28,22 +28,31 @@ public:
     for i:1 thru nbrbody do (
         if length(elastic_dof_idx[i])>0 then (
             body_name: concat("ebody", i),
-            gentran(literal("    ElasticBody &", eval(body_name), "= *(new ElasticBody(", eval(nbrdof), ", ", eval(length(elastic_dof_idx[i])),"))\;", cr))
+            gentran(literal("    ElasticBody &", eval(body_name), "= *(new ElasticBody(", eval(nbrdof), ", ", eval(length(elastic_dof_idx[i])),"))\;", cr)),
+            do_assign(concat(body_name, ".", 'mass), ebody[i]@refmod@mass),
+            do_assign(concat(body_name, ".", "PhiG(0, 0)"), ebody[i]@I@M0[1,1]),
+            do_assign(concat(body_name, ".", "PhiG(1, 1)"), ebody[i]@I@M0[2,2]),
+            do_assign(concat(body_name, ".", "PhiG(2, 2)"), ebody[i]@I@M0[3,3]),
+            do_assign(concat(body_name, ".", "PhiG(0, 1)"), ebody[i]@I@M0[1,2]),
+            do_assign(concat(body_name, ".", "PhiG(1, 0)"), ebody[i]@I@M0[1,2]),
+            do_assign(concat(body_name, ".", "PhiG(0, 2)"), ebody[i]@I@M0[1,3]),
+            do_assign(concat(body_name, ".", "PhiG(2, 0)"), ebody[i]@I@M0[1,3]),
+            do_assign(concat(body_name, ".", "PhiG(1, 2)"), ebody[i]@I@M0[2,3]),
+            do_assign(concat(body_name, ".", "PhiG(2, 1)"), ebody[i]@I@M0[2,3])
         ) else (
             body_name: concat("body", i),
-            gentran(literal("    Body &", eval(body_name), "= *(new Body(", eval(nbrdof), "))\;", cr))
+            gentran(literal("    Body &", eval(body_name), "= *(new Body(", eval(nbrdof), "))\;", cr)),
+            do_assign(concat(body_name, ".", 'mass), mass[i]),
+            do_assign(concat(body_name, ".", "PhiG(0, 0)"), IG[i][1,1]),
+            do_assign(concat(body_name, ".", "PhiG(1, 1)"), IG[i][2,2]),
+            do_assign(concat(body_name, ".", "PhiG(2, 2)"), IG[i][3,3]),
+            do_assign(concat(body_name, ".", "PhiG(0, 1)"), IG[i][1,2]),
+            do_assign(concat(body_name, ".", "PhiG(1, 0)"), IG[i][1,2]),
+            do_assign(concat(body_name, ".", "PhiG(0, 2)"), IG[i][1,3]),
+            do_assign(concat(body_name, ".", "PhiG(2, 0)"), IG[i][1,3]),
+            do_assign(concat(body_name, ".", "PhiG(1, 2)"), IG[i][2,3]),
+            do_assign(concat(body_name, ".", "PhiG(2, 1)"), IG[i][2,3])
         ),
-        i_: i-1,
-        do_assign(concat(body_name, ".", 'mass), mass[i]),
-        do_assign(concat(body_name, ".", "PhiG(0, 0)"), IG[i][1,1]),
-        do_assign(concat(body_name, ".", "PhiG(1, 1)"), IG[i][2,2]),
-        do_assign(concat(body_name, ".", "PhiG(2, 2)"), IG[i][3,3]),
-        do_assign(concat(body_name, ".", "PhiG(0, 1)"), IG[i][1,2]),
-        do_assign(concat(body_name, ".", "PhiG(1, 0)"), IG[i][1,2]),
-        do_assign(concat(body_name, ".", "PhiG(0, 2)"), IG[i][1,3]),
-        do_assign(concat(body_name, ".", "PhiG(2, 0)"), IG[i][1,3]),
-        do_assign(concat(body_name, ".", "PhiG(1, 2)"), IG[i][2,3]),
-        do_assign(concat(body_name, ".", "PhiG(2, 1)"), IG[i][2,3]),
         gentran(literal(cr)),
         
         if index_relative[i]=1 then (
@@ -58,40 +67,41 @@ public:
                 if j#length(elastic_dof_idx[i]) then gentran(literal(", "))
             ),
             gentran(literal("}\;", cr)),
+                                              
             gentran(literal("    ", eval(body_name), ".edof.assign(edof_idx", eval(i), ", edof_idx", eval(i), "+", eval(length(elastic_dof_idx[i])), ")\;", cr)),
-            gentran(literal("    ", eval(body_name), ".md << ", eval(ebody[i]@md[1]), ", ", eval(ebody[i]@md[2]), ", ", eval(ebody[i]@md[3]), "\;", cr)),
+            gentran(literal("    ", eval(body_name), ".md << ", eval(ebody[i]@md@M0[1, 1]), ", ", eval(ebody[i]@md@M0[2, 1]), ", ", eval(ebody[i]@md@M0[3, 1]), "\;", cr)),
             for j:1 thru length(elastic_dof_idx[i]) do (
-                gentran(literal("    ", eval(body_name), ".Ct[", eval(j-1), "] << ", eval(ebody[i]@Ct[j][1]), ", ", eval(ebody[i]@Ct[j][2]), ", ", eval(ebody[i]@Ct[j][3]), "\;", cr))
+                gentran(literal("    ", eval(body_name), ".Ct[", eval(j-1), "] << ", eval(ebody[i]@Ct@M0[j, 1]), ", ", eval(ebody[i]@Ct@M0[j, 2]), ", ", eval(ebody[i]@Ct@M0[j, 3]), "\;", cr))
             ),
             for j:1 thru length(elastic_dof_idx[i]) do (
-                gentran(literal("    ", eval(body_name), ".Cr[", eval(j-1), "] << ", eval(ebody[i]@Cr[j][1]), ", ", eval(ebody[i]@Cr[j][2]), ", ", eval(ebody[i]@Cr[j][3]), "\;", cr))
+                gentran(literal("    ", eval(body_name), ".Cr[", eval(j-1), "] << ", eval(ebody[i]@Cr@M0[j, 1]), ", ", eval(ebody[i]@Cr@M0[j, 2]), ", ", eval(ebody[i]@Cr@M0[j, 3]), "\;", cr))
             ),
             for j:1 thru length(elastic_dof_idx[i]) do (
                 for k:1 thru length(elastic_dof_idx[i]) do (
-                    gentran(literal("    ", eval(body_name), ".Me(", eval((j-1)), ", ", eval(k-1), ")= ", eval(ebody[i]@Me[j][k]), "\; "))
+                    gentran(literal("    ", eval(body_name), ".Me(", eval((j-1)), ", ", eval(k-1), ")= ", eval(ebody[i]@Me@M0[j, k]), "\; "))
                 ),
                 gentran(literal(cr))
             ),
             for j:1 thru length(elastic_dof_idx[i]) do (
-                gentran(literal("    ", eval(body_name), ".Gr[", eval(j-1), "] << ", eval(ebody[i]@Gr[j][1, 1]), ", ", eval(ebody[i]@Gr[j][1, 2]), ", ", eval(ebody[i]@Gr[j][1, 3]), ", ", eval(ebody[i]@Gr[j][2, 1]), ", ", eval(ebody[i]@Gr[j][2, 2]), ", ", eval(ebody[i]@Gr[j][2, 3]), ", ", eval(ebody[i]@Gr[j][3, 1]), ", ", eval(ebody[i]@Gr[j][3, 2]), ", ", eval(ebody[i]@Gr[j][3, 3]), "\;", cr))
+                gentran(literal("    ", eval(body_name), ".Gr[", eval(j-1), "] << ", eval(ebody[i]@Gr@M0[j][1, 1]), ", ", eval(ebody[i]@Gr@M0[j][1, 2]), ", ", eval(ebody[i]@Gr@M0[j][1, 3]), ", ", eval(ebody[i]@Gr@M0[j][2, 1]), ", ", eval(ebody[i]@Gr@M0[j][2, 2]), ", ", eval(ebody[i]@Gr@M0[j][2, 3]), ", ", eval(ebody[i]@Gr@M0[j][3, 1]), ", ", eval(ebody[i]@Gr@M0[j][3, 2]), ", ", eval(ebody[i]@Gr@M0[j][3, 3]), "\;", cr))
             ),
             for j:1 thru length(elastic_dof_idx[i]) do (
                 for k:1 thru length(elastic_dof_idx[i]) do (
-                    gentran(literal("    ", eval(body_name), ".Ge[", eval((k-1)*length(elastic_dof_idx[i])+j-1), "] << ", eval(ebody[i]@Ge[j][k][1]), ", ", eval(ebody[i]@Ge[j][k][2]), ", ", eval(ebody[i]@Ge[j][k][3]), "\;", cr))
+                    gentran(literal("    ", eval(body_name), ".Ge[", eval((k-1)*length(elastic_dof_idx[i])+j-1), "] << ", eval(ebody[i]@Ge@M0[j][k, 1]), ", ", eval(ebody[i]@Ge@M0[j][k, 2]), ", ", eval(ebody[i]@Ge@M0[j][k, 3]), "\;", cr))
                 )
             ),
             for j:1 thru length(elastic_dof_idx[i]) do (
                 for k:1 thru 6 do (
-                    gentran(literal("    ", eval(body_name), ".Oe(", eval(j-1), ", ",  eval(k-1), ")= ", eval(ebody[i]@Oe[j][k]), "\; "))
+                    gentran(literal("    ", eval(body_name), ".Oe(", eval(j-1), ", ",  eval(k-1), ")= ", eval(ebody[i]@Oe@M0[j, k]), "\; "))
                 ),
                 gentran(literal(cr))
             ),
             for j:1 thru length(elastic_dof_idx[i]) do (
-                gentran(literal("    ", eval(body_name), ".K(", eval(j-1), ")= ", eval(ebody[i]@K[j]), "\; "))
+                gentran(literal("    ", eval(body_name), ".K(", eval(j-1), ")= ", eval(ebody[i]@K@M0[j, j]), "\; "))
             ),
             gentran(literal(cr)),
             for j:1 thru length(elastic_dof_idx[i]) do (
-                gentran(literal("    ", eval(body_name), ".D(", eval(j-1), ")= ", eval(ebody[i]@D[j]), "\; "))
+                gentran(literal("    ", eval(body_name), ".D(", eval(j-1), ")= ", eval(ebody[i]@D@M0[j, j]), "\; "))
             ),
             gentran(literal(cr))
         ),
@@ -149,14 +159,14 @@ void <<gentran(literal(eval(filename)))>>System::computeMotion() {
         for j:1 thru nbrdof do (
             j_: j-1,
             for k:1 thru 3 do (
-                do_assign(concat("body[", i_, "]->vGpartial(", k-1, ", ", j_,")"), vGpartial[i, j][k, 1])
+                do_assign(concat("body[", i_, "]->vGpartial(", k-1, ", ", j_,")"), vGpartial[i][j][k, 1])
             )
         ),
         gentran(literal(cr)),
         for j:1 thru nbrdof do (
             j_: j-1,
             for k:1 thru 3 do (
-                do_assign(concat("body[", i_, "]->omegapartial(", k-1, ", ", j_, ")"), omegapartial[i, j][k, 1])
+                do_assign(concat("body[", i_, "]->omegapartial(", k-1, ", ", j_, ")"), omegapartial[i][j][k, 1])
             )
         ),
         
@@ -171,3 +181,8 @@ void <<gentran(literal(eval(filename)))>>System::computeMotion() {
     )
 )>>
 }
+
+void <<gentran(literal(eval(filename)))>>System::computeAppliedEfforts() {
+<<if file_search(user_file)#false then gentranin(user_file)>>
+}
+

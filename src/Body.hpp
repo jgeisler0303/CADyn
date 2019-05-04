@@ -30,6 +30,9 @@ public:
 	virtual void computeForceBalance();
     virtual void generalizedBalance(Eigen::Ref<VecX> f);
 
+    void applyForceInLocal(const Eigen::Ref<const Vec> &r, const Eigen::Ref<const Vec> &F);
+    void applyForceIn0(const Eigen::Ref<const Vec> &r, const Eigen::Ref<const Vec> &F);
+        
     double mass;
     Mat PhiG;
 

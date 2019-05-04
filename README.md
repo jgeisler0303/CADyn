@@ -1,6 +1,6 @@
 Introduction
 ============
-CADyn stands for Computer Aided Dynamics and is a framwork for generating custom-code to simulate multibody dynamic behavior. It is a complete rework of the [EasyDyn](http://hosting.umons.ac.be/html/mecara/EasyDyn/) software.
+CADyn stands for Computer Aided Dynamics and is a framwork for generating custom-code to simulate multi-body systems dynamic behavior. It is a complete rework of the [EasyDyn](http://hosting.umons.ac.be/html/mecara/EasyDyn/) software.
 The purpose of the rework was firstly to provide an object oriented architecture and interface using modern C++ that encapsulates all internal aspects of the simulation process, and secondly to replace the dependency to the GSL library for vector and matrix calculations by the more C++ friendly [eigen3](http://eigen.tuxfamily.org) library.
 Although the algorithms used remain basically the same as in EasyDyn, all code was rewritten from scratch. This and the new interface together with some new features were reasons to give this project a new name.
 

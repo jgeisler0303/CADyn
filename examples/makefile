@@ -35,7 +35,7 @@ $(TARGETDIR)/%_app : $(TARGETDIR)/%_app.cpp
 	$(CPP) $(CPPFLAGS) $(INCLUDES) $< -L$(LIB_PATH) -lCADyn -o $@
 
 $(TARGETDIR)/%_app.cpp : %.mac | $(TARGETDIR)
-	maxima -q --batch-string="load(\"../gen/cagem.mac\"); cagem(\"$<\", \"$(TARGETDIR)\");"
+	maxima -q --batch-string="load(\"i.lisp\");load(\"../gen/cagem.mac\");sysdef:cagem(\"$<\");cagem2c(sysdef, \"$(TARGETDIR)\");"
 
 $(TARGETDIR):
 	-mkdir $(TARGETDIR)

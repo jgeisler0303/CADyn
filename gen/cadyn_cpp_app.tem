@@ -10,11 +10,6 @@
 
 // g++ -std=c++0x -I. -I ../../src <<gentran(literal(eval(filename)))>>_app.cpp -L../../Debug -lCADyn -o <<gentran(literal(eval(filename)))>>_app
 
-// put your external force caculations here
-void <<gentran(literal(eval(filename)))>>System::computeAppliedEfforts() {
-<<if file_search(user_file)#false then gentranin(user_file)>>
-}
-
 int main(int argc, char* argv[]) {
     <<gentran(literal(eval(filename)))>>System system;
 

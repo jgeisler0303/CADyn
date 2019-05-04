@@ -45,8 +45,21 @@ void Body::computeForceBalance() {
 void Body::generalizedBalance(Eigen::Ref<VecX> f) {
 	f-= vGpartial.transpose() * R;
 	f-= omegapartial.transpose() * MG;
+    
+    // dfdq__-= dvGpartialdq__.transpose()*R + vGpartial.transpose()*dRdq__;
+    // dfdq__-= domegapartialdq__.transpose()*MG + omegapartial.transpose()*dMGdq__;
 }
 
 void Body::computeGravity(const Eigen::Ref<const Vec> &g) {
 	R+= mass * g;
+}
+
+void Body::applyForceInLocal(const Eigen::Ref<const Vec> &r, const Eigen::Ref<const Vec> &F) {
+    Vec Fin0= TG.linear() * F;
+    applyForceIn0(r, Fin0);
+}
+
+void Body::applyForceIn0(const Eigen::Ref<const Vec> &r, const Eigen::Ref<const Vec> &Fin0) {
+    Fext+= Fin0;
+    Mext+= (TG.linear()*r).cross(Fin0);
 }
