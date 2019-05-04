@@ -77,10 +77,60 @@ simplify(x):= block([s0, s1, s2, s3, s4],
 );
 
 
-defstruct(sysdef_type (file, name, nbrdof, nbrbody, nbrin, nbrdep, gravity, mass, IG, T0G, vG, omega, aG, omegad, vGpartial, omegapartial, elasticpartial, BodyRef, ebody, elastic_dof_idx, pi, pdi, pddi, qi, qdi, FinalTime, StepSave, StepMax));
+defstruct(sysdef_type (file, name, nbrdof, nbrbody, nbrin, nbrdep, gravity, mass, IG, T0G, vG, omega, aG, omegad, vGpartial, omegapartial, elasticpartial, BodyRef, ebody, elastic_dof_idx, pi, pdi, pddi, qi, qdi, FinalTime, StepSave, StepMax, appliedF, appliedM, appliedFe, SIMPLIFY, u));
+defstruct(cagem_out (sys_rel, sys_abs, forces, f, params, f_lin, accelerations, outputs));
+defstruct(bodyforces_type (R, MG, Re));
+defstruct(lin_model (M, E, A, B));
+
+cagem(file):= block([output, i, appliedF, appliedM, appliedFe, T0G, accelerations],
+    output: new(cagem_out),
+
+    output@sys_rel: prepareKinematics(file),
+    output@sys_abs: composeMotion(output@sys_rel),
+    output@forces: computeForceBalance(output@sys_abs),
+    
+    appliedForcesZero(output@sys_abs),
+    for i:1 thru output@sys_abs@nbrbody do T0G[i]: output@sys_abs@T0G[i],
+    appliedForces(),
+    
+    for i: 1 thru output@sys_rel@nbrbody do (
+        output@forces@R[i]: output@forces@R[i] + appliedF[i],
+        output@forces@MG[i]: output@forces@MG[i] + appliedM[i],
+        output@forces@Re[i]: output@forces@Re[i] + appliedFe[i]        
+    ),
+    
+    output@f: generalizedBalance(output@sys_abs, output@forces),
+    if output@sys_abs@SIMPLIFY=1 then
+        output@f: simplify(output@f),
+    
+    if WITH_LINEAR=1 then
+        output@f_lin: linearize(output@f, output@sys_rel@u)
+    else (
+        output@f_lin@M: [],
+        output@f_lin@E: [],
+        output@f_lin@A: [],
+        output@f_lin@B: []
+    ),
+    
+        
+    output@params: listify(subset(setify(listofvars(output@f)), lambda([x], not(subvarp(x) and (op(x)=qdd or op(x)=qd or op(x)=q)) or member(x, output@sys_rel@u)))),
+    
+    if WITH_ACCELERATIONS=1 then (
+        output@accelerations: calcAccelerations(output@f, output@f_lin@M),
+        if output@sys_abs@SIMPLIFY=1 then
+            output@accelerations: simplify(output@accelerations),
+        accelerations: output@accelerations
+    ) else (
+        output@accelerations: []
+    ),
+    
+    output@outputs: modelOutputs(),
+    
+    output
+);
 
 /* CAGeM procedure */
-cagem(file):= block([
+prepareKinematics(file):= block([
     time0, timeKI1, timeKI2, timeSP1, timeSP2, timeCPP, timePLT,
     ssKI1, ssKI2, ssKI, ssSP1, ssSP2, ssSP, ssCPP, ssPLT,
     timeTEXFR, ssTEXFR, timeTEXEN, ssTEXEN, timeTotal, ss, mm, seconds,
@@ -109,6 +159,9 @@ cagem(file):= block([
 
     /* Option flags initialization. */
     if SIMPLIFY='SIMPLIFY then SIMPLIFY: 1,
+    if WITH_LINEAR='WITH_LINEAR then WITH_LINEAR: 0,
+    if WITH_ACCELERATIONS='WITH_ACCELERATIONS then WITH_ACCELERATIONS: 0,
+    if WITH_LINEAR#1 then WITH_ACCELERATIONS: 0,
     if INPUTS='INPUTS then INPUTS: 0,
     if FinalTime='FinalTime then FinalTime: 10.0,
     if StepSave='StepSave then StepSave: 0.01,
@@ -359,7 +412,7 @@ cagem(file):= block([
     mm: floor(ss/60),
     totseconds:trunc(ss-mm*60),
     printf(true, "All the operations are finished. Total CPU-time in Maxima: ~d:~6,3,,,,'0h min.~%", mm, totseconds),
-                    
+    
     sysdef: new(sysdef_type),
 
     sysdef@file: file,
@@ -390,10 +443,15 @@ cagem(file):= block([
     sysdef@FinalTime: FinalTime,
     sysdef@StepSave: StepSave,
     sysdef@StepMax: StepMax,
-
+    sysdef@appliedF: makelist(appliedF[i], i, 1, nbrbody),
+    sysdef@appliedM: makelist(appliedM[i], i, 1, nbrbody),
+    sysdef@appliedFe: makelist(appliedFe[i], i, 1, nbrbody),
+    sysdef@SIMPLIFY: SIMPLIFY,
+    sysdef@u: u,
+        
     sysdef
 );
-    
+
 
 do_assign(n_work, e_work):= block([],
     gentran(lrsetq(eval(n_work), scanmap('float, e_work)))
@@ -593,6 +651,62 @@ emptyElasticMode(nedof):= block([b, rm],
     b
 );
 
+genericEmptyTaylor(order, nrow, ncol, nelem, nq, nqn, struct, name):= block([t],
+    t: new(mtaylor),
+    t@order: order,
+    t@nrow: nrow,
+    t@ncol: ncol,
+    t@nelem: nelem,
+    t@nq: nq,
+    t@nqn: nqn,
+    t@struct: struct,
+    
+    name: eval_string(concat("'", name)),
+    
+    /* TODO: consider symmetric matrices */
+    if nelem>0 then
+        t@M0: makelist(genmatrix(lambda([i, j], concat(name, "0_", k, "__", i, "_", j)), nrow, ncol), k, 1, nelem)
+    else
+        t@M0: genmatrix(lambda([i, j], concat(name, "0_", i, "_", j)), nrow, ncol),
+    
+    if order>0 then
+        if nelem>0 then
+            t@M1: makelist(makelist(genmatrix(lambda([i, j], concat(name, "1_", l, "_", k, "__", i, "_", j)), nrow, ncol), k, 1, nelem), l, 1, nq)
+        else
+            t@M1: makelist(genmatrix(lambda([i, j], concat(name, "1_", l, "__", i, "_", j)), nrow, ncol), l, 1, nq),
+        
+            
+    if order>1 then
+        error("Elements of class taylor with order > 1 currently not supported"),
+            
+    t
+);
+
+genericElasticMode(nedof, name):= block([b, rm],
+    b: new(modal),
+    
+    rm: new(refmod),
+    
+    rm@mass: eval_string(concat("'", name, "_mass")),
+    rm@nelastq: nedof,
+    rm@ielastq: makelist(sconcat(name, " DOF", i), i, 1, nedof),
+    
+    b@refmod: rm,
+    
+    b@md: genericEmptyTaylor(1, 3, 1, 0, nedof, 0, 3, concat(name, "_md")),
+    b@I: genericEmptyTaylor(1, 3, 3, 0, nedof, 0, 2, concat(name, "_I")), /* 2nd order element currently not supported */
+    b@Ct: genericEmptyTaylor(1, nedof, 3, 0, nedof, 0, 3, concat(name, "_Ct")),
+    b@Cr: genericEmptyTaylor(1, nedof, 3, 0, nedof, 0, 3, concat(name, "_Cr")),
+    b@Me: genericEmptyTaylor(0, nedof, nedof, 0, nedof, 0, 2, concat(name, "_Me")),
+    b@Gr: genericEmptyTaylor(1, 3, 3, nedof, nedof, 0, 3, concat(name, "_Gr")),
+    b@Ge: genericEmptyTaylor(0, nedof, 3, nedof, nedof, 0, 3, concat(name, "_Ge")),
+    b@Oe: genericEmptyTaylor(1, nedof, 6, 0, nedof, 0, 3, concat(name, "_Oe")),
+    b@K: genericEmptyTaylor(1, nedof, nedof, 0, nedof, 0, 2, concat(name, "_K")),
+    b@D: genericEmptyTaylor(0, nedof, nedof, 0, nedof, 0, 2, concat(name, "_D")),
+
+    b
+);
+
 calcElasticModeLumpedPrecomputed(PHI, rr, mm):= block([b, i, iPHI, jPHI, md, Ct, Cr, Me, Mee, Gr, Oe, Ge, Gee], 
     b: emptyElasticMode(length(PHI)),
     
@@ -740,7 +854,6 @@ composeMotion(sysdef):= block([erel, vrel, arel, wrel, wdrel, vGpartial, omegapa
 
 
 computeForceBalance(sysdef):= block([R, MG, PhiG_local, aG_local, omegad_local, omega_local, R_local, MG_local, Re, Ct, Cr, Ct_, Gr, Gr_, w, Ge, Ge_, K, D, grav_local],
-    defstruct(bodyforces_type (R, MG, Re)),
     bodyforces: new(bodyforces_type),
     
     for i: 1 thru sysdef@nbrbody do (
@@ -849,5 +962,101 @@ generalizedBalance(sysdef, bodyforces):= block([],
         */
     ),
     
-    f
+    flatten(args(f))
+);
+
+appliedForcesZero(sys):= (
+    for i:1 thru sys@nbrbody do (
+        appliedF[i]: zeromatrix(3, 1),
+        appliedM[i]: zeromatrix(3, 1),
+        appliedFe[i]: zeromatrix(length(sys@elastic_dof_idx[i]), 1)
+    )
+);
+
+linearize(f, u):= block([M, E, A, A1, A2, B, out, f_],
+    f_: transpose(matrix(f)),
+    M: zeromatrix(length(f_), 0),
+    for i: 1 thru length(f_) do (
+        M: addcol(M, diff(f_, qdd[i]))
+    ),
+    E: ratsimp(mat_unblocker(diag_matrix(identfor(M), M))),
+    /* E: subst([cos(3*q[2])=0, sin(3*q[2])=0, sin(q[2])=0, cos(q[2])=0, qd[2]^2=0], E)$ */
+    /* E: ratsimp(taytorat(taylor(E, [q[0], q[1], qd[0], qd[1]], 0, 0))); */
+
+
+    A1: zeromatrix(length(f_), 0),
+    for i: 1 thru length(f_) do (
+        A1: addcol(A1, diff(f_, q[i]))
+    ),
+    A2: zeromatrix(length(f_), 0),
+    for i: 1 thru length(f_) do (
+        A2: addcol(A2, diff(f_, qd[i]))
+    ),
+    A: ratsimp(mat_unblocker(matrix([zerofor(A1), identfor(A1)], [-A1, -A2]))),
+    /* A: subst([cos(3*q[2])=0, sin(3*q[2])=0, sin(q[2])=0, cos(q[2])=0, qd[2]^2=0], A)$ */
+    /* A: ratsimp(taytorat(taylor(A, [q[0], q[1], qd[0], qd[1]], 0, 0)));*/
+
+    B: zeromatrix(length(f_), 0),
+    for i: 1 thru length(u) do (
+        B: addcol(B, diff(f_, u[i]))
+    ),
+    B: ratsimp(mat_unblocker(matrix([zerofor(B)], [-B]))),
+    
+    out: new(lin_model),
+    out@M: M,
+    out@E: E,
+    out@A: A,
+    out@B: B,
+    out
+);
+
+calcAccelerations(f, M):= block([QDD, f_],
+    QDD: transpose(matrix(makelist(qdd[i], i, 1, length(f)))),
+    f_: ratsimp(M.QDD-transpose(matrix(f))),
+    
+    flatten(args(invert(M).f_))
+);
+
+writeMATLABMat(fid, name, m):= block([i, j],
+    printf(fid, "~a= [~%", name),
+    for i: 1 thru length(m) do (
+        printf(fid, "    "),
+        for j: 1 thru length(transpose(m)) do (
+            printf(fid, "~a", (ssubst(")", "]", ssubst("(", "[", string(m[i, j]))))),
+            if j#length(transpose(m)) then
+                printf(fid, ", ")
+        ),
+        if i=length(m) then
+            printf(fid, "~%")
+        else
+            printf(fid, ";~%")
+    ),
+    printf(fid, "];~%")
+);
+
+writeMATLAB(file, f, y, lin):= block([i, fid],
+    fid: openw(file),
+    
+    printf(fid, "f= [~%"),
+    for i: 1 thru length(f) do (
+        printf(fid, "    ~a~%", (ssubst(")", "]", ssubst("(", "[", string(f[i])))))
+    ),
+    printf(fid, "];~%~%"),
+
+    printf(fid, "y= [~%"),
+    for i: 1 thru length(y) do (
+        printf(fid, "    ~a~%", (ssubst(")", "]", ssubst("(", "[", string(y[i])))))
+    ),
+    printf(fid, "];~%"),
+    
+    if length(lin)>0 and length(lin@E)>0 then (
+        printf(fid, "~%"),
+        writeMATLABMat(fid, "E", lin@E),
+        printf(fid, "~%"),
+        writeMATLABMat(fid, "A", lin@A),
+        printf(fid, "~%"),
+        writeMATLABMat(fid, "B", lin@B)
+    ),
+    
+    close(fid)
 );

@@ -17,13 +17,13 @@ void IntegratorCompareVisitor::start() {
 
 	std::string line;
 	std::getline(ref_file, line);
-	if(!ref_file.good()) throw std::domain_error("Reference file is empty.");
+	if(ref_file.fail()) throw std::domain_error("Reference file is empty.");
 
 	std::istringstream in(line);
 
 	std::string time_str;
 	in >> time_str;
-	if(!in.good() || time_str.compare("time")!=0) {
+	if(in.fail() || time_str.compare("time")!=0) {
 		std::stringstream err_msg;
 		err_msg << "Invalid header in reference file. 'time' not found. Found: " << time_str;
 		throw std::domain_error(err_msg.str());
@@ -35,7 +35,7 @@ void IntegratorCompareVisitor::start() {
 
 		in >> q_name >> qd_name >> qdd_name;
 
-		if(!in.good()) {
+		if(in.fail()) {
 			std::stringstream err_msg;
 			err_msg << "Invalid header in reference file. Names of state " << idof <<" not found.";
 			throw std::domain_error(err_msg.str());
@@ -76,7 +76,7 @@ void IntegratorCompareVisitor::step() {
 
 	std::string line;
 	std::getline(ref_file, line);
-	if(!ref_file.good()){
+	if(ref_file.fail()){
 		std::stringstream err_msg;
 		err_msg << "Reference file too short at line " << nline;
 		throw std::domain_error(err_msg.str());
@@ -85,7 +85,7 @@ void IntegratorCompareVisitor::step() {
 	std::istringstream in(line);
 	double time;
 	in >> time;
-	if(!in.good()) {
+	if(in.fail()) {
 		std::stringstream err_msg;
 		err_msg << "Invalid data in reference file. Values for time not found at line " << nline << ".";
 		throw std::domain_error(err_msg.str());
@@ -101,7 +101,7 @@ void IntegratorCompareVisitor::step() {
 
 		in >> ref_q >> ref_qd >> ref_qdd;
 
-		if(!in.good()) {
+		if(in.fail()) {
 			std::stringstream err_msg;
 			err_msg << "Invalid data in reference file. Values for state " << idof <<" not found at line " << nline << ".";
 			throw std::domain_error(err_msg.str());
