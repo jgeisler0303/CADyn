@@ -20,8 +20,8 @@ Izz[1]:l0^2/12*mass[1];
 Izz[2]:l1^2/12*mass[2];
 
 /*  Definition of the position matrices*/
-T0G[1] : Trotz(q[1]) . Tdisp(0,-l0/2,0);
-T0G[2] : Trotz(q[1]) . Tdisp(0,-l0,0) . Trotz(q[2]) . Tdisp(0,-l1/2,0);
+T0G[1] : Tdisp(z[1],z[2],0) . Trotz(q[1]) . Tdisp(0,-l0/2,0);
+T0G[2] : Tdisp(z[1],z[2],0) . Trotz(q[1]) . Tdisp(0,-l0,0) . Trotz(q[2]) . Tdisp(0,-l1/2,0);
 
 /*  Initial conditions*/
 qi[2]:1;
