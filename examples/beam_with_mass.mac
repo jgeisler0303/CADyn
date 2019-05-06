@@ -1,0 +1,37 @@
+title: "Simulation of an elastic beam";
+
+/* Gravity vector */
+gravity[1]: 0;
+gravity[2]: -9.81;
+gravity[3]: 0;
+
+elastic_dof[1]: [q[1]];
+PHI: [makelist([(0.1*i)^2, 0, 0], i, 1, 6)];
+rr: makelist([0, 0.1*i, 0], i, 1, 6);
+mm: makelist(0.1, i, 1, 6);
+ebody[1]: calcElasticModeLumpedPrecomputed(PHI, rr, mm);
+ebody[1]@K@M0[1, 1]: 1;
+ebody[1]@D@M0[1, 1]: 0.01;
+ebody[1]@I@M0[1, 1]: 1;
+ebody[1]@I@M0[2, 2]: 1;
+
+ebody[1]@frame[6]@phi@M1[1]: matrix([0], [1], [0]);
+
+T0G[1]:  Tdisp(0,0,0);
+
+mass[2]:2;
+Ixx[2]:1;
+Iyy[2]:1;
+Izz[2]:1;
+
+TrefG[2] : Telast(1, 6);
+BodyRef[2]: 1;
+
+/* Initial conditions */
+qi[1]: 1.0;
+qdi[1]: 0;
+
+/* Simulation parameters */
+FinalTime: 20;
+StepSave: 0.05;
+StepMax: 0.01;
