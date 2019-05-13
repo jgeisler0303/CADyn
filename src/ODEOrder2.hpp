@@ -22,7 +22,7 @@ public:
 	void writeStateVariables(std::ostream &OutFile);
 	VecX computeResidualsInt();
 	virtual VecX computeResiduals()= 0;
-	void calcJacobian(double alphaM, double alphaC, double alphaK, double tol);
+    virtual void calcJacobian(double alphaM, double alphaC, double alphaK, double tol);
 	bool staticEquilibrium();
 	int newmarkOneStep(double h, double &errq, bool hmodified= true);
 	bool newmarkInterval(double tfinal, double &h, double hmax);

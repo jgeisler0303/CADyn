@@ -1,0 +1,43 @@
+#include "IntegratorGNUPlotVisitor.hpp"
+#include "IntegratorCompareVisitor.hpp"
+#include <iostream>
+#include <stdlib.h>
+#include <chrono>
+#include <cstdio>
+#include <ctime>
+
+<<gentran(literal("#include \"", eval(filename), "System2.hpp\""))>>
+
+// g++ -std=c++0x -I. -I ../../src <<gentran(literal(eval(filename)))>>_app.cpp -L../../Debug -lCADyn -o <<gentran(literal(eval(filename)))>>_app
+
+int main(int argc, char* argv[]) {
+    <<gentran(literal(eval(filename)))>>System system;
+
+<<block([j], 
+    ?ccurrind\*: 4,
+    for j:1 thru nbrdof do (
+        do_assign(concat("system.q(", j-1, ")"), qi[j]),
+        do_assign(concat("system.qd(", j-1, ")"), qdi[j])
+    ))>>
+
+    {
+        AbstractIntegratorVisitor *visitor;
+        if(argc==2)
+            visitor= new IntegratorCompareVisitor(string(argv[1]));
+        else
+            visitor= new IntegratorGNUPlotVisitor();
+        
+        std::clock_t startcputime = std::clock();
+<<gentran(literal("        bool res= system.newmarkIntegration(", eval(float(FinalTime)), ", ", eval(float(StepSave)), ", ", eval(float(StepMax)), ", visitor)\;", cr))>>
+        double cpu_duration = (std::clock() - startcputime) / (double)CLOCKS_PER_SEC;
+
+        if(!res) {
+            std::cout <<gentran(literal("<<"))>> "Error in integrator" <<gentran(literal("<<"))>> std::endl;
+            exit (EXIT_FAILURE);
+        }
+        std::cout <<gentran(literal("<<"))>> "Run-time of integrator: " <<gentran(literal("<<"))>> cpu_duration <<gentran(literal("<<"))>> " seconds" <<gentran(literal("<<"))>> std::endl;
+        if(argc==2)
+            static_cast<IntegratorCompareVisitor*>(visitor)->printResult();
+    }
+    exit (EXIT_SUCCESS);
+}

@@ -34,3 +34,7 @@ qdi[1]: 0;
 FinalTime: 20;
 StepSave: 0.05;
 StepMax: 0.01;
+
+appliedForces():= (
+    appliedF[1]: matrix([-q[1] -0.01*qd[1]], [0], [0])          
+);

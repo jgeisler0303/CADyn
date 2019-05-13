@@ -1,0 +1,200 @@
+#include "ODEOrder2.hpp"
+
+<<gentran(literal("\/\* File generated form template cadyn2_cpp.tem on ", eval(timedate()), ". Do not edit! \*\/", cr))>>
+<<gentran(literal("\/\* Multibody system: ", eval(title), " \*\/", cr, cr))>>
+
+#define mcond(c, a, x, b) ((c)? a:b)
+
+class <<gentran(literal(eval(filename), "System"))>>: public ODEOrder2 {
+public:
+    static const int nStates= <<gentran(literal(eval(nbrdof)))>>;
+    static const int nInputs= <<gentran(literal(eval(nbrin)))>>;
+    static const int nbrdep= <<gentran(literal(eval(nbrdep)))>>;
+    
+    <<gentran(literal(eval(filename), "System"))>>() : 
+        ODEOrder2(nStates, nInputs, "<<gentran(literal(eval(filename)))>>", "<<gentran(literal(eval(title)))>>"),
+        p(nbrdep),
+        pd(nbrdep),
+        pdd(nbrdep)
+        {}; 
+        
+    virtual VecX computeResiduals();
+    virtual void calcJacobian(double alphaM, double alphaC, double alphaK, double tol);
+    
+private:
+    VecX p, pd, pdd;
+};
+
+const int <<gentran(literal(eval(filename)))>>System::nbrdep;
+
+VecX <<gentran(literal(eval(filename)))>>System::computeResiduals() {
+    VecX f_(nbrdof);
+    
+    // TODO write constant values only once
+<<block([i, i_, opt], 
+    ?ccurrind\*: 8,
+
+    if nbrdep > 0 then (
+        gentran(literal("    // Dependant variables", cr)),
+        gentran("    {", literal(cr)),
+                    
+        opt: genopt([pi, pdi, pddi]),
+        gentran(literal(cr)),
+
+        for i:1 thru nbrdep do (
+            i_: i-1,
+            do_assign('p[i_], opt[1][i]),
+            do_assign('pd[i_], opt[2][i]),
+            do_assign('pdd[i_], opt[3][i]),
+            gentran(literal(cr))
+        ),
+        gentran("    }", literal(cr))        
+    )
+)>>
+
+    {
+<<block([i, i_, opt], 
+    ?ccurrind\*: 8,
+
+    opt: genopt([f]),
+    gentran(literal(cr)),
+
+    for i:1 thru nbrdof do (
+        i_: i-1,
+        do_assign(concat("f_[", i_, "]"), opt[1][i])
+    )
+)>>
+    }
+
+    return f_;
+}
+
+void <<gentran(literal(eval(filename)))>>System::calcJacobian(double alphaM, double alphaC, double alphaK, double tol) {
+    MatX M(nbrdof, nbrdof);
+    MatX C(nbrdof, nbrdof);
+    MatX K(nbrdof, nbrdof);
+    
+    // TODO write constant values only once
+<<block([i, i_, opt], 
+    ?ccurrind\*: 8,
+
+    if nbrdep > 0 then (
+        gentran(literal("    // Dependant variables", cr)),
+        gentran("    {", literal(cr)),
+                    
+        opt: genopt([pi, pdi, pddi]),
+        gentran(literal(cr)),
+
+        for i:1 thru nbrdep do (
+            i_: i-1,
+            do_assign('p[i_], opt[1][i]),
+            do_assign('pd[i_], opt[2][i]),
+            do_assign('pdd[i_], opt[3][i]),
+            gentran(literal(cr))
+        ),
+        gentran("    }", literal(cr))        
+    )
+)>>
+
+    {
+<<block([i, i_, j, j_, opt], 
+    ?ccurrind\*: 8,
+    
+    opt: genopt([f, E, A, flatten(args(Ap)), flatten(args(Apd)), flatten(args(Apdd)), flatten(args(dp_dq)), flatten(args(dp_dp)), flatten(args(dpd_dq)), flatten(args(dpd_dp)), flatten(args(dpdd_dq)), flatten(args(dpdd_dqd)), flatten(args(dpdd_dqdd)), flatten(args(dpdd_dp)), flatten(args(dpdd_dpd))]),
+    gentran(literal(cr)),
+
+    genmat(opt[2], nbrdof, nbrdof, nbrdof, nbrdof, "M"),
+    gentran(literal(cr)),
+    genmat(opt[3], nbrdof, nbrdof, nbrdof, 0, "C"),
+    gentran(literal(cr)),
+    genmat(opt[3], nbrdof, nbrdof, nbrdof, nbrdof, "K"),
+    gentran(literal(cr)),
+
+    if nbrdep > 0 then (
+        gentran(literal("        // TODO make these fix size matrices", cr)),
+
+        gentran(literal("        MatX Ap(nbrdof, nbrdep)\;", cr)),
+        genmat(opt[4], nbrdof, nbrdep, 0, 0, "Ap"),
+        gentran(literal(cr)),
+
+        gentran(literal("        MatX Apd(nbrdof, nbrdep)\;", cr)),
+        genmat(opt[5], nbrdof, nbrdep, 0, 0, "Apd"),
+        gentran(literal(cr)),
+
+        gentran(literal("        MatX Apdd(nbrdof, nbrdep)\;", cr)),
+        genmat(opt[6], nbrdof, nbrdep, 0, 0, "Apdd"),
+        gentran(literal(cr)),
+
+        gentran(literal("        MatX dp_dq(nbrdep, nbrdof)\;", cr)),
+        genmat(opt[7], nbrdep, nbrdof, 0, 0, "dp_dq"),
+        gentran(literal(cr)),
+
+        gentran(literal("        MatX dp_dp(nbrdep, nbrdep)\;", cr)),
+        genmat(opt[8], nbrdep, nbrdep, 0, 0, "dp_dp"),
+        gentran(literal(cr)),
+
+        gentran(literal("        MatX dpd_dq(nbrdep, nbrdof)\;", cr)),
+        genmat(opt[9], nbrdep, nbrdof, 0, 0, "dpd_dq"),
+        gentran(literal(cr)),
+
+        gentran(literal("        MatX dpd_dp(nbrdep, nbrdep)\;", cr)),
+        genmat(opt[10], nbrdep, nbrdof, 0, 0, "dpd_dp"),
+        gentran(literal(cr)),
+
+        gentran(literal("        MatX dpdd_dq(nbrdep, nbrdof)\;", cr)),
+        genmat(opt[11], nbrdep, nbrdof, 0, 0, "dpdd_dq"),
+        gentran(literal(cr)),
+
+        gentran(literal("        MatX dpdd_dqd(nbrdep, nbrdof)\;", cr)),
+        genmat(opt[12], nbrdep, nbrdof, 0, 0, "dpdd_dqd"),
+        gentran(literal(cr)),
+
+        gentran(literal("        MatX dpdd_dqdd(nbrdep, nbrdof)\;", cr)),
+        genmat(opt[13], nbrdep, nbrdof, 0, 0, "dpdd_dqdd"),
+        gentran(literal(cr)),
+
+        gentran(literal("        MatX dpdd_dp(nbrdep, nbrdep)\;", cr)),
+        genmat(opt[14], nbrdep, nbrdep, 0, 0, "dpdd_dp"),
+        gentran(literal(cr)),
+
+        gentran(literal("        MatX dpdd_dpd(nbrdep, nbrdep)\;", cr)),
+        genmat(opt[15], nbrdep, nbrdep, 0, 0, "dpdd_dpd"),
+        gentran(literal(cr)),
+
+        gentran(literal("        dp_dq+= dp_dp*dp_dq\;", cr, cr)),
+
+        gentran(literal("        dpd_dq+= dpd_dp*dp_dq\;", cr)),
+        gentran(literal("        dpd_dq+= dp_dp*dpd_dq\; // dpd_dpd= dp_dp", cr)),
+
+        gentran(literal("        dpdd_dq+= dpdd_dp*dp_dq\;", cr)),
+        gentran(literal("        dpdd_dq+= dpdd_dpd*dpd_dq\;", cr)),
+        gentran(literal("        dpdd_dq+= dp_dp*dpdd_dq\;  // dpdd_dpdd= dp_dp", cr)),
+
+        gentran(literal("        dpdd_dqd+= dpdd_dpd*dp_dq\; // dpd_dqd= dp_dq", cr)),
+        gentran(literal("        dpdd_dqd+= dp_dp*dpdd_dqd\;", cr)),
+
+        gentran(literal("        dpdd_dqdd+= dp_dp*dpdd_dqdd\;", cr, cr)),
+
+        gentran(literal("        K+= Ap*dp_dq + Apd*dpd_dq + Apdd*dpdd_dq\;", cr, cr)),
+        gentran(literal("        C+= Apd*dp_dq + Apdd*dpdd_dqd\;", cr, cr)),
+        gentran(literal("        M+= Apdd*dpdd_dqdd\;", cr, cr))
+    ),
+
+
+    for i:1 thru nbrdof do (
+        i_: i-1,
+        do_assign(concat("f[", i_, "]"), opt[1][i])
+    )
+)>>
+    }
+    
+    Jacobian= alphaM*M + alphaC*C + alphaK*K;
+
+    for(int idof= 0; idof < nbrdof; idof++) {
+        if(doflocked[idof]) {
+            f[idof]= 0.0;
+            Jacobian.col(idof).setZero();
+        }
+    }
+}
+

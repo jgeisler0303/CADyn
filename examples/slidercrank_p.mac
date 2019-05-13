@@ -40,3 +40,7 @@ qdi[1]: 0;
 FinalTime: 6;
 StepSave: 0.05;
 StepMax: 0.01;
+
+appliedForces():= (
+    appliedM[1]: matrix([0], [0], ['if t<2 then 10 else 0])          
+);

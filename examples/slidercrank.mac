@@ -1,5 +1,7 @@
 title: "Simulation of a slider-crank mechanism";
 
+WITH_LINEAR: 1;
+
 /* Gravity vector */
 gravity[1]: 0;
 gravity[2]: -9.81;
@@ -40,3 +42,7 @@ qdi[1]: 0;
 FinalTime: 6;
 StepSave: 0.05;
 StepMax: 0.01;
+
+appliedForces():= (
+    appliedM[1]: matrix([0], [0], ['if t<2 then 10 else 0])          
+);

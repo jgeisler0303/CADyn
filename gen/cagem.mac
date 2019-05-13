@@ -86,10 +86,10 @@ simplify(x):= block([s0, s1, s2, s3, s4],
 );
 
 
-defstruct(sysdef_type (file, name, nbrdof, nbrcon, nbrbody, nbrin, nbrdep, gravity, mass, IG, T0G, vG, omega, aG, omegad, vGpartial, omegapartial, vGpartial_z, omegapartial_z, elasticpartial, BodyRef, ebody, elastic_dof_idx, z_list, node_forces, pi, pdi, pddi, qi, qdi, FinalTime, StepSave, StepMax, appliedF, appliedM, appliedFe, SIMPLIFY, u));
+defstruct(sysdef_type (file, name, nbrdof, nbrcon, nbrbody, nbrin, nbrdep, gravity, mass, IG, T0G, vG, omega, aG, omegad, vGpartial, omegapartial, vGpartial_z, omegapartial_z, elasticpartial, BodyRef, ebody, elastic_dof_idx, z_list, node_forces, pi, pdi, pddi, qi, qdi, FinalTime, StepSave, StepMax, appliedF, appliedM, appliedFe, SIMPLIFY, WITH_LINEAR, WITH_ACCELERATIONS, u));
 defstruct(cagem_out (sys_rel, sys_abs, forces, f, constraints, params, f_lin, accelerations, outputs));
 defstruct(bodyforces_type (R, MG, Re));
-defstruct(lin_model (M, E, A, B));
+defstruct(lin_model (M, E, A, B, Ap, Apd, Apdd, dp_dq, dp_dp, dpd_dq, dpd_dqd, dpd_dp, dpd_dpd, dpdd_dq, dpdd_dqd, dpdd_dqdd, dpdd_dp, dpdd_dpd, dpdd_dpdd));
 
 cagem(file):= block([output, i, appliedF, appliedM, appliedFe, T0G, accelerations],
     output: new(cagem_out),
@@ -116,20 +116,35 @@ cagem(file):= block([output, i, appliedF, appliedM, appliedFe, T0G, acceleration
         output@constraints: simplify(output@constraints)
     ),
     
-    if WITH_LINEAR=1 then
-        output@f_lin: linearize(output@f, output@sys_rel@u)
+    if output@sys_rel@WITH_LINEAR=1 then
+        output@f_lin: linearize(output@f, output@sys_rel)
     else (
         output@f_lin: new(lin_model),
         output@f_lin@M: [],
         output@f_lin@E: [],
         output@f_lin@A: [],
-        output@f_lin@B: []
+        output@f_lin@B: [],
+        output@f_lin@Ap: [],
+        output@f_lin@Apd: [],
+        output@f_lin@Apdd: [],
+        output@f_lin@dp_dq: [],
+        output@f_lin@dp_dp: [],
+        output@f_lin@dpd_dq: [],
+        output@f_lin@dpd_dqd: [],
+        output@f_lin@dpd_dp: [],
+        output@f_lin@dpd_dpd: [],
+        output@f_lin@dpdd_dq: [],
+        output@f_lin@dpdd_dqd: [],
+        output@f_lin@dpdd_dqdd: [],
+        output@f_lin@dpdd_dp: [],
+        output@f_lin@dpdd_dpd: [],
+        output@f_lin@dpdd_dpdd: []
     ),
     
         
     output@params: listify(subset(setify(listofvars(output@f)), lambda([x], not(subvarp(x) and (op(x)=qdd or op(x)=qd or op(x)=q)) or member(x, output@sys_rel@u)))),
     
-    if WITH_ACCELERATIONS=1 then (
+    if output@sys_rel@WITH_ACCELERATIONS=1 then (
         output@accelerations: calcAccelerations(output@f, output@f_lin@M),
         if output@sys_abs@SIMPLIFY=1 then
             output@accelerations: simplify(output@accelerations),
@@ -151,7 +166,7 @@ prepareKinematics(file):= block([
     filePLT, fileTEXFR, fileTEXEN, fileCPP,
     nbrbodymax, nbrdofmax, nbrdepmax, 
     i, j, j_, k, k_, f, temp, phiG, pi, pdi, pddi, p, pd, pdd, q, nbr_relative, elastic_dof_idx, 
-    SIMPLIFY, INPUTS, 
+    SIMPLIFY, INPUTS, WITH_LINEAR, WITH_ACCELERATIONS, 
     title, mass, IG, gravity, T0G, TrefG, elastic_dof, ebody, BodyRef, T0Gd, R0G, R0Gd, MatRot, omega, omega_z, omega_, omegad, vG, vG_z, vG_, aG, nbrdof, nbrz, nbrbody, nbrdep, vGpartial, omegapartial, z_list: [], node_forces: [], vGpartial_z, omegapartial_z,
     qi, qdi, Ixx, Iyy, Izz, Ixy, Ixz, Iyz], 
     local(temp, phiG, mass, IG, gravity, T0G, TrefG, elastic_dof, ebody, BodyRef, T0Gd, R0G, R0Gd, MatRot, omega, omega_z, omega_, omegad, vG, vG_z, vG_, aG, vGpartial, omegapartial, vGpartial_z, omegapartial_, qi, qdi, Ixx, Iyy, Izz, Ixy, Ixz, Iyz, pi, pdi, pddi, p, pd, pdd, q, qi, qdi, FinalTime, StepSave, StepMax),
@@ -173,7 +188,7 @@ prepareKinematics(file):= block([
 
     /* Option flags initialization. */
     if SIMPLIFY='SIMPLIFY then SIMPLIFY: 1,
-    if WITH_LINEAR='WITH_LINEAR then WITH_LINEAR: 0,
+    if WITH_LINEAR='WITH_LINEAR then WITH_LINEAR: 1,
     if WITH_ACCELERATIONS='WITH_ACCELERATIONS then WITH_ACCELERATIONS: 0,
     if WITH_LINEAR#1 then WITH_ACCELERATIONS: 0,
     if INPUTS='INPUTS then INPUTS: 0,
@@ -501,6 +516,8 @@ prepareKinematics(file):= block([
     sysdef@appliedM: makelist(appliedM[i], i, 1, nbrbody),
     sysdef@appliedFe: makelist(appliedFe[i], i, 1, nbrbody),
     sysdef@SIMPLIFY: SIMPLIFY,
+    sysdef@WITH_LINEAR: WITH_LINEAR,
+    sysdef@WITH_ACCELERATIONS: WITH_ACCELERATIONS,
     sysdef@u: u,
         
     sysdef
@@ -511,7 +528,7 @@ do_assign(n_work, e_work):= block([],
     gentran(lrsetq(eval(n_work), scanmap('float, e_work)))
 );
 
-cagem2c(sysdef, [target_dir]):= block(
+cagem2c(sysdef, [target_dir]):= block([i, j, i_, j_, file, title, nbrdof, nbrbody, nbrin, nbrdep, gravity, mass, IG, T0G, vG, omega, aG, omegad, vGpartial, omegapartial, BodyRef, ebody, elastic_dof_idx, pi, pdi, pddi, qi, qdi, FinalTime, StepSave, StepMax],
     file: sysdef@file,
     title: sysdef@name,
     nbrdof: sysdef@nbrdof,
@@ -637,6 +654,119 @@ cagem2c(sysdef, [target_dir]):= block(
     app_file: sconcat(filepath, filename, "_app.cpp"),
     if file_search(app_file)=false then
         gentranin(filename_merge(cagem_dir, "cadyn_cpp_app.tem"), [openw(app_file)])
+);
+
+
+genopt(l):= block([o, temps, replace_list, i],
+    o: optimize(l),
+
+    if length(o)=length(l) then
+        return(o),
+        
+    temps: inpart(o, 1),
+
+    replace_list: makelist(temps[i]=concat(temp, i), i, 1, length(temps)),
+
+    for i: 1 thru length(temps) do (
+        if not(listp(inpart(o, i+1, 2)) or matrixp(inpart(o, i+1, 2))) then (
+            gentran(literal("        double ")),
+            do_assign(concat(temp, i), subst(replace_list, inpart(o, i+1, 2)))
+        )
+    ),
+
+    subst(replace_list, inpart(o, length(temps)+2))
+);
+
+genmat(M, n, m, on, om, name):= block([i, j, i_, j_],
+    for i:1 thru n do (
+        i_: i-1,
+        for j:1 thru m do (
+            j_: j-1,
+            if listp(M) then
+                do_assign(concat(name, "(", i_, ", ", j_, ")"), M[(on+i-1)*m + om+j])
+            else
+                do_assign(concat(name, "(", i_, ", ", j_, ")"), M[on+i, om+j])
+        )
+    )    
+);
+
+make_c_index(v, nbrdof, nbrdep):= block([v_, j, j_],
+    v_: v,
+
+    for j:1 thru nbrdof do (
+        j_: j-1,
+        
+        v_: subst(qdd[j_], qdd[j], v_),
+        v_: subst(qd[j_], qd[j], v_),
+        v_: subst(q[j_], q[j], v_)
+    ),
+    
+    for j:1 thru nbrdep do (
+        j_: j-1,
+        
+        v_: subst(pdd[j_], pdd[j], v_),
+        v_: subst(pd[j_], pd[j], v_),
+        v_: subst(p[j_], p[j], v_)
+    ),
+    
+    v_
+);
+
+cagem2c2(sysdef, [target_dir]):= block([i, j, i_, j_, file, title, nbrdof, nbrbody, nbrin, nbrdep, E, A, Ap, Apd, Apdd, f, pi, pdi, pddi, dp_dq, dp_dp, dpd_dq, dpd_dqd, dpd_dp, dpd_dpd, dpdd_dq, dpdd_dqd, dpdd_dqdd, dpdd_dp, dpdd_dpd, dpdd_dpdd, qi, qdi, FinalTime, StepSave, StepMax],
+    file: sysdef@sys_rel@file,
+    title: sysdef@sys_rel@name,
+    nbrdof: sysdef@sys_rel@nbrdof,
+    nbrbody: sysdef@sys_rel@nbrbody,
+    nbrin: sysdef@sys_rel@nbrin,
+    nbrdep: sysdef@sys_rel@nbrdep,
+    qi: sysdef@sys_abs@qi,
+    qdi: sysdef@sys_abs@qdi,
+    FinalTime: sysdef@sys_abs@FinalTime,
+    StepSave: sysdef@sys_abs@StepSave,
+    StepMax: sysdef@sys_abs@StepMax,
+    
+    E: make_c_index(sysdef@f_lin@E, nbrdof, nbrdep),
+    A: make_c_index(sysdef@f_lin@A, nbrdof, nbrdep),
+    Ap: make_c_index(sysdef@f_lin@Ap, nbrdof, nbrdep),
+    Apd: make_c_index(sysdef@f_lin@Apd, nbrdof, nbrdep),
+    Apdd: make_c_index(sysdef@f_lin@Apdd, nbrdof, nbrdep),
+    dp_dq: make_c_index(sysdef@f_lin@dp_dq, nbrdof, nbrdep),
+    dp_dp: make_c_index(sysdef@f_lin@dp_dp, nbrdof, nbrdep),
+    dpd_dq: make_c_index(sysdef@f_lin@dpd_dq, nbrdof, nbrdep),
+    dpd_dqd: make_c_index(sysdef@f_lin@dpd_dqd, nbrdof, nbrdep),
+    dpd_dp: make_c_index(sysdef@f_lin@dpd_dp, nbrdof, nbrdep),
+    dpd_dpd: make_c_index(sysdef@f_lin@dpd_dpd, nbrdof, nbrdep),
+    dpdd_dq: make_c_index(sysdef@f_lin@dpdd_dq, nbrdof, nbrdep),
+    dpdd_dqd: make_c_index(sysdef@f_lin@dpdd_dqd, nbrdof, nbrdep),
+    dpdd_dqdd: make_c_index(sysdef@f_lin@dpdd_dqdd, nbrdof, nbrdep),
+    dpdd_dp: make_c_index(sysdef@f_lin@dpdd_dp, nbrdof, nbrdep),
+    dpdd_dpd: make_c_index(sysdef@f_lin@dpdd_dpd, nbrdof, nbrdep),
+    dpdd_dpdd: make_c_index(sysdef@f_lin@dpdd_dpdd, nbrdof, nbrdep),
+
+    f: make_c_index(sysdef@f, nbrdof, nbrdep),
+    pi: make_c_index(sysdef@sys_abs@pi, nbrdof, nbrdep),
+    pdi: make_c_index(sysdef@sys_abs@pdi, nbrdof, nbrdep),
+    pddi: make_c_index(sysdef@sys_abs@pddi, nbrdof, nbrdep),
+
+    filepath: pathname_directory(file),
+    if length(target_dir)>0 then (
+        filepath: target_dir[1],
+        if slength(filepath)>0 then
+            if notequal(substring (filepath, slength(filepath), slength(filepath)+1),"/") then
+                filepath: sconcat(filepath, "/")
+    ),
+    filename: pathname_name(file),
+    
+    load("gentran"),
+    gentranlang(c),
+    on('float),
+    off('gentranseg),
+    ?clinelen\*: 1000,            
+    gentranin(filename_merge(cagem_dir, "cadyn2_cpp.tem"), [openw(sconcat(filepath, filename, "System2.hpp"))]),
+                                      
+    app_file: sconcat(filepath, filename, "_app2.cpp"),
+    if file_search(app_file)=false then
+        gentranin(filename_merge(cagem_dir, "cadyn2_cpp_app.tem"), [openw(app_file)])
 );
 
 
@@ -848,7 +978,7 @@ calcElasticModeLumpedPrecomputed(PHI, rr, mm):= block([b, i, iPHI, jPHI, md, Ct,
         for jPHI:1 thru length(PHI) do (
             Ge: [0, 0, 0],
             for i: 1 thru length(PHI[1]) do
-                Ge: Ge - 2*cross(PHI[iPHI][i], PHI[jPHI][i])*mm[i],
+                Ge: Ge + 2*cross(PHI[iPHI][i], PHI[jPHI][i])*mm[i],
             Gee: addrow(Gee, Ge)
         ),
         b@Ge@M0[iPHI]: Gee
@@ -1014,14 +1144,14 @@ computeForceBalance(sysdef):= block([R, MG, PhiG_local, aG_local, omegad_local, 
             MG_local: MG_local - simplify_(Gr_ . omega_local),
 
             w: matrix([omega_local[1, 1]*omega_local[1, 1], omega_local[2, 1]*omega_local[2, 1], omega_local[3, 1]*omega_local[3, 1], omega_local[1, 1]*omega_local[2, 1], omega_local[2, 1]*omega_local[3, 1], omega_local[1, 1]*omega_local[3, 1]]),
-
             Re[i]: Re[i] - simplify_(evalModalTaylor(sysdef@ebody[i]@Oe, sysdef@elastic_dof_idx[i]) . transpose(w)),
+
             Ge: evalModalTaylor(sysdef@ebody[i]@Ge, sysdef@elastic_dof_idx[i]),
             for iedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
                 Ge_: zeromatrix(3, 1),
                 for jedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
                     /* TODO: check for correct order of jedof and iedof */
-                    Ge_: Ge_ + transpose(row(Ge[jedof], iedof)) * qd[sysout@elastic_dof_idx[i][iedof]]
+                    Ge_: Ge_ + transpose(row(Ge[jedof], iedof)) * qd[sysout@elastic_dof_idx[i][jedof]]
                 ),
                 Re[i][iedof, 1]: Re[i][iedof, 1] - simplify_(transpose(Ge_) . omega_local)
             ),
@@ -1029,9 +1159,10 @@ computeForceBalance(sysdef):= block([R, MG, PhiG_local, aG_local, omegad_local, 
             K: evalModalTaylor(sysdef@ebody[i]@K, sysdef@elastic_dof_idx[i]),
             D: evalModalTaylor(sysdef@ebody[i]@D, sysdef@elastic_dof_idx[i]),
             for iedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
-                /* TODO currently only diagonal stiffness and damping matrices supported */
-                Re[i][iedof, 1]: Re[i][iedof, 1] - K[iedof, iedof] * q[sysout@elastic_dof_idx[i][iedof]],
-                Re[i][iedof, 1]: Re[i][iedof, 1] - D[iedof, iedof] * qd[sysout@elastic_dof_idx[i][iedof]]
+                for jedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
+                    Re[i][iedof, 1]: Re[i][iedof, 1] - K[iedof, jedof] * q[sysout@elastic_dof_idx[i][jedof]],
+                    Re[i][iedof, 1]: Re[i][iedof, 1] - D[iedof, jedof] * qd[sysout@elastic_dof_idx[i][jedof]]
+                )
             ),
 
             R[i]: simplify_(submatrix(4, sysdef@T0G[i], 4) . R_local),
@@ -1105,7 +1236,9 @@ appliedForcesZero(sys):= (
     )
 );
 
-linearize(f, u):= block([M, E, A, A1, A2, B, out, f_],
+linearize(f, sys):= block([M, E, A, A1, A2, B, out, f_],
+    out: new(lin_model),
+
     f_: transpose(matrix(f)),
     M: zeromatrix(length(f_), 0),
     for i: 1 thru length(f_) do (
@@ -1128,13 +1261,31 @@ linearize(f, u):= block([M, E, A, A1, A2, B, out, f_],
     /* A: subst([cos(3*q[2])=0, sin(3*q[2])=0, sin(q[2])=0, cos(q[2])=0, qd[2]^2=0], A)$ */
     /* A: ratsimp(taytorat(taylor(A, [q[0], q[1], qd[0], qd[1]], 0, 0)));*/
 
+    out@Ap: jacobian(f, makelist(p[i], i, 1, sys@nbrdep)),
+    out@Apd: jacobian(f, makelist(pd[i], i, 1, sys@nbrdep)),
+    out@Apdd: jacobian(f, makelist(pdd[i], i, 1, sys@nbrdep)),
+
     B: zeromatrix(length(f_), 0),
-    for i: 1 thru length(u) do (
-        B: addcol(B, diff(f_, u[i]))
+    for i: 1 thru length(sys@u) do (
+        B: addcol(B, diff(f_, sys@u[i]))
     ),
     B: ratsimp(mat_unblocker(matrix([zerofor(B)], [-B]))),
     
-    out: new(lin_model),
+    out@dp_dq: jacobian(sys@pi, makelist(q[i], i, 1, sys@nbrdof)),
+    out@dp_dp: jacobian(sys@pi, makelist(p[i], i, 1, sys@nbrdep)),
+
+    out@dpd_dq: jacobian(sys@pdi, makelist(q[i], i, 1, sys@nbrdof)),
+    out@dpd_dqd: jacobian(sys@pdi, makelist(qd[i], i, 1, sys@nbrdof)),
+    out@dpd_dp: jacobian(sys@pdi, makelist(p[i], i, 1, sys@nbrdep)),
+    out@dpd_dpd: jacobian(sys@pdi, makelist(pd[i], i, 1, sys@nbrdep)),
+
+    out@dpdd_dq: jacobian(sys@pddi, makelist(q[i], i, 1, sys@nbrdof)),
+    out@dpdd_dqd: jacobian(sys@pddi, makelist(qd[i], i, 1, sys@nbrdof)),
+    out@dpdd_dqdd: jacobian(sys@pddi, makelist(qdd[i], i, 1, sys@nbrdof)),
+    out@dpdd_dp: jacobian(sys@pddi, makelist(p[i], i, 1, sys@nbrdep)),
+    out@dpdd_dpd: jacobian(sys@pddi, makelist(pd[i], i, 1, sys@nbrdep)),
+    out@dpdd_dpdd: jacobian(sys@pddi, makelist(pdd[i], i, 1, sys@nbrdep)),
+
     out@M: M,
     out@E: E,
     out@A: A,

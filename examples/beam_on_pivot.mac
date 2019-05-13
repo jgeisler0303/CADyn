@@ -29,3 +29,7 @@ TrefG[2]:  Tdisp(0, 0.1, 0);
 FinalTime: 20;
 StepSave: 0.05;
 StepMax: 0.01;
+
+appliedForces():= (
+    appliedM[1]: matrix([0], [0], [-4*q[1] - 0.1*qd[1]])          
+);
