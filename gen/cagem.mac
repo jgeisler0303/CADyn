@@ -142,7 +142,7 @@ cagem(file):= block([output, i, appliedF, appliedM, appliedFe, T0G, acceleration
     ),
     
         
-    output@params: listify(subset(setify(listofvars(output@f)), lambda([x], not(subvarp(x) and (op(x)=qdd or op(x)=qd or op(x)=q)) or member(x, output@sys_rel@u)))),
+    output@params: listify(subset(setify(listofvars(output@f)), lambda([x], not(subvarp(x) and (op(x)=qdd or op(x)=qd or op(x)=q) or member(x, output@sys_rel@u) or x=t)))),
     
     if output@sys_rel@WITH_ACCELERATIONS=1 then (
         output@accelerations: calcAccelerations(output@f, output@f_lin@M),
@@ -712,7 +712,7 @@ make_c_index(v, nbrdof, nbrdep):= block([v_, j, j_],
     v_
 );
 
-cagem2c2(sysdef, [target_dir]):= block([i, j, i_, j_, file, title, nbrdof, nbrbody, nbrin, nbrdep, E, A, Ap, Apd, Apdd, f, pi, pdi, pddi, dp_dq, dp_dp, dpd_dq, dpd_dqd, dpd_dp, dpd_dpd, dpdd_dq, dpdd_dqd, dpdd_dqdd, dpdd_dp, dpdd_dpd, dpdd_dpdd, qi, qdi, FinalTime, StepSave, StepMax],
+cagem2c2(sysdef, [target_dir]):= block([i, j, i_, j_, file, title, nbrdof, nbrbody, nbrin, nbrdep, E, A, Ap, Apd, Apdd, f, pi, pdi, pddi, dp_dq, dp_dp, dpd_dq, dpd_dqd, dpd_dp, dpd_dpd, dpdd_dq, dpdd_dqd, dpdd_dqdd, dpdd_dp, dpdd_dpd, dpdd_dpdd, qi, qdi, params, FinalTime, StepSave, StepMax],
     file: sysdef@sys_rel@file,
     title: sysdef@sys_rel@name,
     nbrdof: sysdef@sys_rel@nbrdof,
@@ -747,7 +747,8 @@ cagem2c2(sysdef, [target_dir]):= block([i, j, i_, j_, file, title, nbrdof, nbrbo
     pi: make_c_index(sysdef@sys_abs@pi, nbrdof, nbrdep),
     pdi: make_c_index(sysdef@sys_abs@pdi, nbrdof, nbrdep),
     pddi: make_c_index(sysdef@sys_abs@pddi, nbrdof, nbrdep),
-
+    params: sysdef@params,
+                                       
     filepath: pathname_directory(file),
     if length(target_dir)>0 then (
         filepath: target_dir[1],
