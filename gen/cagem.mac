@@ -142,7 +142,7 @@ cagem(file):= block([output, i, appliedF, appliedM, appliedFe, T0G, acceleration
     ),
     
         
-    output@params: listify(subset(setify(listofvars(output@f)), lambda([x], not((subvarp(x) and (op(x)=qdd or op(x)=qd or op(x)=q)) or member(x, output@sys_rel@u) or member(x, output@sys_rel@external))))),
+output@params: listify(subset(setify(listofvars(output@f)), lambda([x], not((subvarp(x) and (op(x)=qdd or op(x)=qd or op(x)=q)) or member(x, output@sys_rel@u) or member(x, output@sys_rel@external) or x=t)))),
     
     if output@sys_rel@WITH_ACCELERATIONS=1 then (
         output@accelerations: calcAccelerations(output@f, output@f_lin@M),
