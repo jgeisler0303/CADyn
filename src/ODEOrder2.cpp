@@ -170,6 +170,8 @@ int ODEOrder2::newmarkOneStep(double h, double &errq, bool hmodified) {
 bool ODEOrder2::newmarkInterval(double tfinal, double &h, double hmax) {
 	bool hchanged= true;
 	double errq;
+    n_steps= 0;
+    n_back_steps= 0;
 
 	if (h>hmax) h= hmax;
 	while(t < tfinal) {
@@ -184,6 +186,7 @@ bool ODEOrder2::newmarkInterval(double tfinal, double &h, double hmax) {
 		VecX qdd_sto= qdd;
 
 		int code= newmarkOneStep(h, errq, hchanged);
+        n_steps++;
 		hchanged= false;
 
 		if((code) || (errq>AbsTol))	{
@@ -199,6 +202,8 @@ bool ODEOrder2::newmarkInterval(double tfinal, double &h, double hmax) {
 			qdd= qdd_sto;
 			if(h<hminmin)
 				return false;
+            
+            n_back_steps++;
 		} else {
 			if((errq < (0.1*AbsTol)) && (h<hmax)) {
 				h*= sqrt(AbsTol/(2.1*errq + 0.04*AbsTol));

@@ -44,6 +44,9 @@ public:
     double AbsTol= 1E-6;
     double RelTol= 1E-6;
 	double hminmin= 1E-8;
+    
+    int n_back_steps;
+    int n_steps;
 };
 
 class AbstractIntegratorVisitor {

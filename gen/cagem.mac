@@ -86,10 +86,10 @@ simplify(x):= block([s0, s1, s2, s3, s4],
 );
 
 
-defstruct(sysdef_type (file, name, nbrdof, nbrcon, nbrbody, nbrin, nbrdep, gravity, mass, IG, T0G, vG, omega, aG, omegad, vGpartial, omegapartial, vGpartial_z, omegapartial_z, elasticpartial, BodyRef, ebody, elastic_dof_idx, z_list, node_forces, pi, pdi, pddi, qi, qdi, FinalTime, StepSave, StepMax, appliedF, appliedM, appliedFe, SIMPLIFY, WITH_LINEAR, WITH_ACCELERATIONS, u));
+defstruct(sysdef_type (file, name, nbrdof, nbrcon, nbrbody, nbrin, nbrdep, gravity, mass, IG, T0G, vG, omega, aG, omegad, vGpartial, omegapartial, vGpartial_z, omegapartial_z, elasticpartial, BodyRef, ebody, elastic_dof_idx, z_list, node_forces, pi, pdi, pddi, qi, qdi, FinalTime, StepSave, StepMax, appliedF, appliedM, appliedFe, SIMPLIFY, WITH_LINEAR, WITH_ACCELERATIONS, u, external, ext_param));
 defstruct(cagem_out (sys_rel, sys_abs, forces, f, constraints, params, f_lin, accelerations, outputs));
 defstruct(bodyforces_type (R, MG, Re));
-defstruct(lin_model (M, E, A, B, Ap, Apd, Apdd, dp_dq, dp_dp, dpd_dq, dpd_dqd, dpd_dp, dpd_dpd, dpdd_dq, dpdd_dqd, dpdd_dqdd, dpdd_dp, dpdd_dpd, dpdd_dpdd));
+defstruct(lin_model (M, E, A, B, C, D, Ap, Apd, Apdd, dp_dq, dp_dp, dpd_dq, dpd_dqd, dpd_dp, dpd_dpd, dpdd_dq, dpdd_dqd, dpdd_dqdd, dpdd_dp, dpdd_dpd, dpdd_dpdd));
 
 cagem(file):= block([output, i, appliedF, appliedM, appliedFe, T0G, accelerations],
     output: new(cagem_out),
@@ -142,7 +142,7 @@ cagem(file):= block([output, i, appliedF, appliedM, appliedFe, T0G, acceleration
     ),
     
         
-    output@params: listify(subset(setify(listofvars(output@f)), lambda([x], not(subvarp(x) and (op(x)=qdd or op(x)=qd or op(x)=q)) or member(x, output@sys_rel@u)))),
+    output@params: listify(subset(setify(listofvars(output@f)), lambda([x], not((subvarp(x) and (op(x)=qdd or op(x)=qd or op(x)=q)) or member(x, output@sys_rel@u) or member(x, output@sys_rel@external))))),
     
     if output@sys_rel@WITH_ACCELERATIONS=1 then (
         output@accelerations: calcAccelerations(output@f, output@f_lin@M),
@@ -155,6 +155,14 @@ cagem(file):= block([output, i, appliedF, appliedM, appliedFe, T0G, acceleration
     
     output@outputs: modelOutputs(),
     
+    if output@sys_rel@WITH_LINEAR=1 then
+        output: linearizeOut(output)
+    else (
+        output@f_lin: new(lin_model),
+        output@f_lin@C: [],
+        output@f_lin@D: []
+    ),
+    
     output
 );
 
@@ -166,10 +174,10 @@ prepareKinematics(file):= block([
     filePLT, fileTEXFR, fileTEXEN, fileCPP,
     nbrbodymax, nbrdofmax, nbrdepmax, 
     i, j, j_, k, k_, f, temp, phiG, pi, pdi, pddi, p, pd, pdd, q, nbr_relative, elastic_dof_idx, 
-    SIMPLIFY, INPUTS, WITH_LINEAR, WITH_ACCELERATIONS, 
+    SIMPLIFY, INPUTS, WITH_LINEAR, WITH_ACCELERATIONS, EXTERNAL, EXT_PARAM, 
     title, mass, IG, gravity, T0G, TrefG, elastic_dof, ebody, BodyRef, T0Gd, R0G, R0Gd, MatRot, omega, omega_z, omega_, omegad, vG, vG_z, vG_, aG, nbrdof, nbrz, nbrbody, nbrdep, vGpartial, omegapartial, z_list: [], node_forces: [], vGpartial_z, omegapartial_z,
     qi, qdi, Ixx, Iyy, Izz, Ixy, Ixz, Iyz], 
-    local(temp, phiG, mass, IG, gravity, T0G, TrefG, elastic_dof, ebody, BodyRef, T0Gd, R0G, R0Gd, MatRot, omega, omega_z, omega_, omegad, vG, vG_z, vG_, aG, vGpartial, omegapartial, vGpartial_z, omegapartial_, qi, qdi, Ixx, Iyy, Izz, Ixy, Ixz, Iyz, pi, pdi, pddi, p, pd, pdd, q, qi, qdi, FinalTime, StepSave, StepMax),
+    local(temp, phiG, mass, IG, gravity, T0G, TrefG, elastic_dof, ebody, BodyRef, T0Gd, R0G, R0Gd, MatRot, omega, omega_z, omega_, omegad, vG, vG_z, vG_, aG, vGpartial, omegapartial, vGpartial_z, omegapartial_, qi, qdi, Ixx, Iyy, Izz, Ixy, Ixz, Iyz, pi, pdi, pddi, p, pd, pdd, q, qi, qdi, FinalTime, StepSave, StepMax, EXTERNAL, EXT_PARAM),
 
 
     /* Program initialization. */
@@ -191,7 +199,9 @@ prepareKinematics(file):= block([
     if WITH_LINEAR='WITH_LINEAR then WITH_LINEAR: 1,
     if WITH_ACCELERATIONS='WITH_ACCELERATIONS then WITH_ACCELERATIONS: 0,
     if WITH_LINEAR#1 then WITH_ACCELERATIONS: 0,
-    if INPUTS='INPUTS then INPUTS: 0,
+    if INPUTS='INPUTS then INPUTS: [],
+    if EXTERNAL='EXTERNAL then EXTERNAL: [],
+    if EXT_PARAM='EXT_PARAM then EXT_PARAM: [],
     if FinalTime='FinalTime then FinalTime: 10.0,
     if StepSave='StepSave then StepSave: 0.01,
     if StepMax='StepMax then StepMax: 0.01,
@@ -204,7 +214,7 @@ prepareKinematics(file):= block([
     for i: 1 thru nbrz do z_list: endcons(z[i], z_list),
     if member('pi, arrays) then nbrdep: lmax(flatten(rest(arrayinfo(pi), 2))) else nbrdep: 0,
     if not(member(gravity, arrays)) then gravity: [0.0, 0.0, -9.81],
-    nbrin: INPUTS,
+    nbrin: length(INPUTS),
             
     IG: makelist(zeromatrix(3, 3), i, 1, nbrbody),
     for i:1 thru nbrbody do (
@@ -518,14 +528,16 @@ prepareKinematics(file):= block([
     sysdef@SIMPLIFY: SIMPLIFY,
     sysdef@WITH_LINEAR: WITH_LINEAR,
     sysdef@WITH_ACCELERATIONS: WITH_ACCELERATIONS,
-    sysdef@u: u,
+    sysdef@u: INPUTS,
+    sysdef@external: EXTERNAL,
+    sysdef@ext_param: EXT_PARAM,
         
     sysdef
 );
 
 
 do_assign(n_work, e_work):= block([],
-    gentran(lrsetq(eval(n_work), scanmap('float, e_work)))
+    gentran(lrsetq(eval(n_work), scanmap('float, subst(subst_list, e_work))))
 );
 
 cagem2c(sysdef, [target_dir]):= block([i, j, i_, j_, file, title, nbrdof, nbrbody, nbrin, nbrdep, gravity, mass, IG, T0G, vG, omega, aG, omegad, vGpartial, omegapartial, BodyRef, ebody, elastic_dof_idx, pi, pdi, pddi, qi, qdi, FinalTime, StepSave, StepMax],
@@ -712,12 +724,14 @@ make_c_index(v, nbrdof, nbrdep):= block([v_, j, j_],
     v_
 );
 
-cagem2c2(sysdef, [target_dir]):= block([i, j, i_, j_, file, title, nbrdof, nbrbody, nbrin, nbrdep, E, A, Ap, Apd, Apdd, f, pi, pdi, pddi, dp_dq, dp_dp, dpd_dq, dpd_dqd, dpd_dp, dpd_dpd, dpdd_dq, dpdd_dqd, dpdd_dqdd, dpdd_dp, dpdd_dpd, dpdd_dpdd, qi, qdi, FinalTime, StepSave, StepMax],
+cagem2c2(sysdef, [target_dir]):= block([i, j, i_, j_, file, title, nbrdof, nbrbody, nbrin, nbrdep, external, params, E, A, Ap, Apd, Apdd, f, pi, pdi, pddi, dp_dq, dp_dp, dpd_dq, dpd_dqd, dpd_dp, dpd_dpd, dpdd_dq, dpdd_dqd, dpdd_dqdd, dpdd_dp, dpdd_dpd, dpdd_dpdd, qi, qdi, FinalTime, StepSave, StepMax],
     file: sysdef@sys_rel@file,
     title: sysdef@sys_rel@name,
     nbrdof: sysdef@sys_rel@nbrdof,
     nbrbody: sysdef@sys_rel@nbrbody,
     nbrin: sysdef@sys_rel@nbrin,
+    external: sysdef@sys_rel@external,
+    params: append(sysdef@params, sysdef@sys_rel@ext_param),
     nbrdep: sysdef@sys_rel@nbrdep,
     qi: sysdef@sys_abs@qi,
     qdi: sysdef@sys_abs@qdi,
@@ -747,6 +761,12 @@ cagem2c2(sysdef, [target_dir]):= block([i, j, i_, j_, file, title, nbrdof, nbrbo
     pi: make_c_index(sysdef@sys_abs@pi, nbrdof, nbrdep),
     pdi: make_c_index(sysdef@sys_abs@pdi, nbrdof, nbrdep),
     pddi: make_c_index(sysdef@sys_abs@pddi, nbrdof, nbrdep),
+    
+    subst_list: [],
+    for i:1 thru nbrin do
+        subst_list: endcons(sysdef@sys_rel@u[i]='u[i-1], subst_list),
+    for i:1 thru length(sysdef@params) do
+        subst_list: endcons(sysdef@params[i]=concat('param\., sysdef@params[i]), subst_list),
 
     filepath: pathname_directory(file),
     if length(target_dir)>0 then (
@@ -1096,7 +1116,7 @@ computeForceBalance(sysdef):= block([R, MG, PhiG_local, aG_local, omegad_local, 
     bodyforces: new(bodyforces_type),
     
     for i: 1 thru sysdef@nbrbody do (
-        if length(sysout@elastic_dof_idx[i]) = 0 then (
+        if sysout@ebody[i] = ebody[i] then (
             R[i]: simplify_(sysdef@mass[i] * (sysdef@gravity - sysdef@aG[i])),
 
             PhiG_local: simplify_(submatrix(4, sysdef@T0G[i], 4) . sysdef@IG[i] . transpose(submatrix(4, sysdef@T0G[i], 4))),
@@ -1293,6 +1313,16 @@ linearize(f, sys):= block([M, E, A, A1, A2, B, out, f_],
     out
 );
 
+linearizeOut(sys):= block([Cq, Cqd],
+    Cq: jacobian(sys@outputs, makelist(q[i], i, 1, sys@sys_abs@nbrdof)),
+    Cqd: jacobian(sys@outputs, makelist(qd[i], i, 1, sys@sys_abs@nbrdof)),
+    sys@f_lin@C: mat_unblocker(matrix([Cq, Cqd])),
+    
+    sys@f_lin@D: jacobian(sys@outputs, sys@sys_abs@u),
+    
+    sys
+);
+
 calcAccelerations(f, M):= block([QDD, f_],
     QDD: transpose(matrix(makelist(qdd[i], i, 1, length(f)))),
     f_: ratsimp(M.QDD-transpose(matrix(f))),
@@ -1338,7 +1368,11 @@ writeMATLAB(file, f, y, lin):= block([i, fid],
         printf(fid, "~%"),
         writeMATLABMat(fid, "A", lin@A),
         printf(fid, "~%"),
-        writeMATLABMat(fid, "B", lin@B)
+        writeMATLABMat(fid, "B", lin@B),
+        printf(fid, "~%"),
+        writeMATLABMat(fid, "C", lin@C),
+        printf(fid, "~%"),
+        writeMATLABMat(fid, "D", lin@D)
     ),
     
     close(fid)

@@ -1,9 +1,61 @@
 #include "ODEOrder2.hpp"
+#include <string>
+#include <map>
 
 <<gentran(literal("\/\* File generated form template cadyn2_cpp.tem on ", eval(timedate()), ". Do not edit! \*\/", cr))>>
 <<gentran(literal("\/\* Multibody system: ", eval(title), " \*\/", cr, cr))>>
 
 #define mcond(c, a, x, b) ((c)? a:b)
+
+class ParameterInfo {
+public:
+    ParameterInfo() :
+        data(nullptr),
+        nrows(0),
+        ncols(0)
+        {}
+        
+    ParameterInfo(double *data_, int nrows_, int ncols_) :
+        data(data_),
+        nrows(nrows_),
+        ncols(ncols_)
+        {}
+
+private:
+    double *data;
+    int nrows, ncols;
+};
+
+class <<gentran(literal(eval(filename), "Parameters"))>> {
+public:
+    <<gentran(literal(eval(filename), "Parameters"))>>();
+
+    std::map<std::string, ParameterInfo> info_map;
+    
+<<block([],
+    for i:1 thru length(params) do (
+        if subvarp(params[i]) then (
+            dims: args(params[i]),
+            if length(dims)=1 then dims: endcons(1, dims),
+            
+            gentran(literal("    Eigen::Matrix<double, ", eval(dims[1]), ", ", eval(dims[2]), "> ", eval(op(params[i])), "\;", cr))
+        ) else
+            gentran(literal("    double ", eval(params[i]), "\;", cr))
+    )
+)>>};
+
+<<gentran(literal(eval(filename), "Parameters"))>>::<<gentran(literal(eval(filename), "Parameters"))>>() : info_map() {
+<<block([],
+    for i:1 thru length(params) do (
+        if subvarp(params[i]) then (
+            dims: args(params[i]),
+            if length(dims)=1 then dims: endcons(1, dims),
+            
+            gentran(literal("    info_map[\"", eval(op(params[i])), "\"]= ParameterInfo(", eval(op(params[i])), ".data(), ", eval(dims[1]), ", ", eval(dims[2]), ")\;", cr))
+        ) else
+            gentran(literal("    info_map[\"", eval(params[i]), "\"]= ParameterInfo(&", eval(params[i]), ", 1, 1)\;", cr))
+    )
+)>>}
 
 class <<gentran(literal(eval(filename), "System"))>>: public ODEOrder2 {
 public:
@@ -15,22 +67,40 @@ public:
         ODEOrder2(nStates, nInputs, "<<gentran(literal(eval(filename)))>>", "<<gentran(literal(eval(title)))>>"),
         p(nbrdep),
         pd(nbrdep),
-        pdd(nbrdep)
+        pdd(nbrdep),
+        param()
         {}; 
         
     virtual VecX computeResiduals();
     virtual void calcJacobian(double alphaM, double alphaC, double alphaK, double tol);
+<<block([], 
+    if length(external) > 0 then (
+        gentran(literal("    void calculateExternal()\;", cr)),
+        gentran(literal("    void calculateExternalWithDeriv()\;", cr))
+    )
+)>>
     
 private:
     VecX p, pd, pdd;
-};
+    
+    <<gentran(literal(eval(filename), "Parameters"))>> param;
+    
+<<block([i], 
+    for i:1 thru length(external) do
+        gentran(literal("    double ", eval(external[i]), "\;", cr))
+)>>};
 
 const int <<gentran(literal(eval(filename)))>>System::nbrdep;
 
 VecX <<gentran(literal(eval(filename)))>>System::computeResiduals() {
     VecX f_(nbrdof);
     
-    // TODO write constant values only once
+<<block([], 
+    if length(external) > 0 then (
+        gentran(literal("    calculateExternal()\;", cr, cr))
+    )
+)>>
+    // TODO write non-constant values only once
 <<block([i, i_, opt], 
     ?ccurrind\*: 8,
 
@@ -74,7 +144,12 @@ void <<gentran(literal(eval(filename)))>>System::calcJacobian(double alphaM, dou
     MatX C(nbrdof, nbrdof);
     MatX K(nbrdof, nbrdof);
     
-    // TODO write constant values only once
+<<block([], 
+    if length(external) > 0 then (
+        gentran(literal("    calculateExternalWithDeriv()\;", cr, cr))
+    )
+)>>
+    // TODO write non-constant values only once
 <<block([i, i_, opt], 
     ?ccurrind\*: 8,
 
