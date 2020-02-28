@@ -1347,7 +1347,7 @@ writeMATLABMat(fid, name, m):= block([i, j],
     printf(fid, "];~%")
 );
 
-writeMATLAB(file, f, y, lin):= block([i, fid],
+writeMATLAB_nonlinear(file, f, y, lin):= block([i, fid],
     fid: openw(file),
     
     printf(fid, "f= [~%"),
@@ -1361,6 +1361,12 @@ writeMATLAB(file, f, y, lin):= block([i, fid],
         printf(fid, "    ~a~%", (ssubst(")", "]", ssubst("(", "[", string(y[i])))))
     ),
     printf(fid, "];~%"),
+    
+    close(fid)
+);
+
+writeMATLAB_linear(file, f, y, lin):= block([i, fid],
+    fid: openw(file),
     
     if length(lin)>0 and length(lin@E)>0 then (
         printf(fid, "~%"),
