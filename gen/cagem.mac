@@ -785,8 +785,8 @@ cagem2c2(sysdef, [target_dir]):= block([i, j, i_, j_, file, title, nbrdof, nbrbo
     gentranin(filename_merge(cagem_dir, "cadyn2_cpp.tem"), [openw(sconcat(filepath, filename, "System2.hpp"))]),
                                       
     app_file: sconcat(filepath, filename, "_app2.cpp"),
-    if file_search(app_file)=false then
-        gentranin(filename_merge(cagem_dir, "cadyn2_cpp_app.tem"), [openw(app_file)])
+    /* if file_search(app_file)=false then */
+    gentranin(filename_merge(cagem_dir, "cadyn2_cpp_app.tem"), [openw(app_file)])
 );
 
 

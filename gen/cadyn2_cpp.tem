@@ -23,12 +23,22 @@ public:
         ncols(ncols_)
         {}
 
+    void setParam(const double value);
+    double getParam();
     bool isSet;
     
 private:
     double *data;
     int nrows, ncols;
 };
+
+void ParameterInfo::setParam(const double value) {
+    data[0]= value;
+}
+
+double ParameterInfo::getParam() {
+    return data[0];
+}
 
 class <<gentran(literal(eval(filename), "Parameters"))>> {
 public:
@@ -80,7 +90,7 @@ void <<gentran(literal(eval(filename), "Parameters"))>>::setParam(const std::str
         unsetParams--;
     }
     
-    it->second.data[0]= value;
+    it->second.setParam(value);
 }
 
 double <<gentran(literal(eval(filename), "Parameters"))>>::getParam(const std::string &name) {
@@ -88,7 +98,7 @@ double <<gentran(literal(eval(filename), "Parameters"))>>::getParam(const std::s
     if(it==info_map.end())    
         throw std::runtime_error("Unknown parameter \"" + name + "\".");
     
-    return it->second.data[0];    
+    return it->second.getParam();    
 }
 
 void <<gentran(literal(eval(filename), "Parameters"))>>::setFromFile(const std::string &fileName) {

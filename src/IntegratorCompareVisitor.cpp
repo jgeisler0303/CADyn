@@ -205,32 +205,32 @@ double IntegratorCompareVisitor::total_nrms() {
 void IntegratorCompareVisitor::printResult() {
 	std::cout << "Absolute errors of q: ";
 	for(int i= 0; i<e_q.size(); i++)
-		std::cout << rms_q(i);
+		std::cout << rms_q(i) << ", ";
 	std::cout << std::endl;
 
 	std::cout << "Normalized errors of q: ";
 	for(int i= 0; i<e_q.size(); i++)
-		std::cout << nrms_q(i);
+        std::cout << nrms_q(i) << ", ";
 	std::cout << std::endl;
 
 	std::cout << "Absolute errors of qd: ";
 	for(int i= 0; i<e_qd.size(); i++)
-		std::cout << rms_qd(i);
+        std::cout << rms_qd(i) << ", ";
 	std::cout << std::endl;
 
 	std::cout << "Normalized errors of qd: ";
 	for(int i= 0; i<e_qd.size(); i++)
-		std::cout << nrms_qd(i);
+        std::cout << nrms_qd(i) << ", ";
 	std::cout << std::endl;
 
 	std::cout << "Absolute errors of qdd: ";
 	for(int i= 0; i<e_qd.size(); i++)
-		std::cout << rms_qdd(i);
+        std::cout << rms_qdd(i) << ", ";
 	std::cout << std::endl;
 
 	std::cout << "Normalized errors of qdd: ";
 	for(int i= 0; i<e_qdd.size(); i++)
-		std::cout << nrms_qdd(i);
+        std::cout << nrms_qdd(i) << ", ";
 	std::cout << std::endl;
 
 	std::cout << "Total normalized errors. q: " << total_nrms_q() << ", qd: " << total_nrms_qd() << ", qdd: " << total_nrms_qdd() << std::endl;

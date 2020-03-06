@@ -29,12 +29,11 @@ int main(int argc, char* argv[]) {
     int arg_offset= 0;
     
     if(with_parameters) {
-        if(argc<2) {
-            fprintf(stderr, "The first parameter must be the name of a parameter file.\n");
-            exit (EXIT_FAILURE);
-        }
+        std::string param_file;
+        param_file= argv[0];
+        param_file+= "_param.dat";
         try {
-            system.param.setFromFile(argv[1]);
+            system.param.setFromFile(param_file);
         } catch (const std::exception& e) {
             fprintf(stderr, "Parameter file error: %s\n", e.what());
             exit (EXIT_FAILURE);
@@ -43,7 +42,7 @@ int main(int argc, char* argv[]) {
             fprintf(stderr, "\nAll parameters have to be set. Exiting.\n");
             exit (EXIT_FAILURE);            
         }
-        arg_offset= 1;
+        // arg_offset= 1;
     }
     
     {

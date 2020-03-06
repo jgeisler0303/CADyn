@@ -6,6 +6,8 @@ INC_PATH:= ../src
 INCLUDES:= -I$(TARGETDIR) -I$(INC_PATH)
 CPPFLAGS:= -g3 -O0 -std=c++0x 
 
+SOURCES:= $(INC_PATH)/ODEOrder2.cpp $(INC_PATH)/IntegratorGNUPlotVisitor.cpp $(INC_PATH)/IntegratorCompareVisitor.cpp
+
 TEST_FILES:= $(wildcard *.mac)
 TESTS:= $(patsubst %.mac, %, $(TEST_FILES))
 TEST_APPS:= $(patsubst %, $(TARGETDIR)/%_app, $(TESTS))
@@ -37,7 +39,8 @@ $(TARGETDIR)/%_app : $(TARGETDIR)/%_app.cpp
 	$(CPP) $(CPPFLAGS) $(INCLUDES) $< -L$(LIB_PATH) -lCADyn -o $@
 
 $(TARGETDIR)/%_app2 : $(TARGETDIR)/%_app2.cpp
-	$(CPP) $(CPPFLAGS) $(INCLUDES) $< -L$(LIB_PATH) -lCADyn -o $@
+	$(CPP) $(CPPFLAGS) $(INCLUDES) $< $(SOURCES) -o $@
+	-cp $(patsubst %_param.dat, $(TARGETDIR)/%, $@) $(TARGETDIR)
 
 $(TARGETDIR)/%_app.cpp : %.mac | $(TARGETDIR)
 	maxima -q --batch-string="load(\"i.lisp\")$$ load(\"../gen/cagem.mac\")$$ sysdef:prepareKinematics(\"$<\")$$ cagem2c(sysdef, \"$(TARGETDIR)\")$$ "
