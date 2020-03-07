@@ -117,9 +117,6 @@ bool ODEOrder2::staticEquilibrium() {
 }
 
 int ODEOrder2::newmarkOneStep(double h, bool hmodified) {
-    const double Beta= 0.25;
-    const double Gamma=0.5;
-
     VecX qdd_sto= qdd;
     t+= h;
     q+= h*qd + 0.5*h*h*qdd;
@@ -241,3 +238,20 @@ bool ODEOrder2::newmarkIntegration(double tfinal, double hsave, double hmax, Abs
     if(visitor) visitor->finish();
     return res;
 }
+
+// void ODEOrder2::sensitivities(double ts) {
+//     
+//     
+//     MatX Pddx_Pxn= 
+//     MatX Pddx_Pdxn
+//     
+//     MatX Pddxn_Pxn= Pddx_Pxn.block(0, 0, nbrdof_, nbrdof_);
+//     MatX Pddxn1_Pxn= Pddx_Pxn.block(nbrdof_, 0, nbrdof_, nbrdof_);
+//     MatX Pddxn_Pdxn= Pddx_Pdxn.block(0, 0, nbrdof_, nbrdof_);
+//     MatX Pddxn1_Pdxn= Pddx_Pdxn.block(nbrdof_, 0, nbrdof_, nbrdof_);
+//     
+//     MatX Pxn1_Pxn= MatX::::Identity(nbrdof_, nbrdof_) + ts*ts*((0.5-Beta)*Pddxn_Pxn + Beta*Pddxn1_Pxn);
+//     MatX Pxn1_Pdxn= ts*MatX::::Identity(nbrdof_, nbrdof_) + ts*ts*((0.5-Beta)*Pddxn_Pdxn + Beta*Pddxn1_Pdxn);
+//     MatX Pdxn1_Pxn= ts*((1.0-Gamma)*Pddxn_Pxn + Gamma*Pddxn1_Pxn);
+//     MatX Pdxn1_Pdxn= MatX::::Identity(nbrdof_, nbrdof_) + ts*((0.5-Gamma)*Pddxn_Pdxn + Gamma*Pddxn1_Pdxn);
+// }

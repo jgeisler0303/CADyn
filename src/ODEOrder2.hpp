@@ -47,6 +47,8 @@ public:
     double hminmin= 1E-8;
     int jac_recalc_step= 4;
     int max_steps= 10;
+    double Beta= 0.25;
+    double Gamma=0.5;
     
     int n_back_steps;
     int n_steps;

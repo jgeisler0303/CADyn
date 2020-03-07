@@ -40,7 +40,7 @@ $(TARGETDIR)/%_app : $(TARGETDIR)/%_app.cpp
 
 $(TARGETDIR)/%_app2 : $(TARGETDIR)/%_app2.cpp
 	$(CPP) $(CPPFLAGS) $(INCLUDES) $< $(SOURCES) -o $@
-	-cp $(patsubst %_param.dat, $(TARGETDIR)/%, $@) $(TARGETDIR)
+	-cp $(patsubst $(TARGETDIR)/%, %_param.dat, $@) $(TARGETDIR)
 
 $(TARGETDIR)/%_app.cpp : %.mac | $(TARGETDIR)
 	maxima -q --batch-string="load(\"i.lisp\")$$ load(\"../gen/cagem.mac\")$$ sysdef:prepareKinematics(\"$<\")$$ cagem2c(sysdef, \"$(TARGETDIR)\")$$ "

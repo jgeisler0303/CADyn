@@ -95,7 +95,7 @@ void <<gentran(literal(eval(filename), "Parameters"))>>::setParam(const std::str
     if(it==info_map.end())    
         throw std::runtime_error("Unknown parameter \"" + name + "\".");
     
-    if(it->second.setParam(value))
+    if(!it->second.setParam(value))
         unsetParams--;
 }
 
@@ -272,14 +272,14 @@ void <<gentran(literal(eval(filename)))>>System::calcJacobian(double alphaM, dou
 <<block([i, i_, j, j_, opt], 
     ?ccurrind\*: 8,
     
-    opt: genopt([f, E, A, flatten(args(Ap)), flatten(args(Apd)), flatten(args(Apdd)), flatten(args(dp_dq)), flatten(args(dp_dp)), flatten(args(dpd_dq)), flatten(args(dpd_dp)), flatten(args(dpdd_dq)), flatten(args(dpdd_dqd)), flatten(args(dpdd_dqdd)), flatten(args(dpdd_dp)), flatten(args(dpdd_dpd))]),
+    opt: genopt([f, E, -A, flatten(args(Ap)), flatten(args(Apd)), flatten(args(Apdd)), flatten(args(dp_dq)), flatten(args(dp_dp)), flatten(args(dpd_dq)), flatten(args(dpd_dp)), flatten(args(dpdd_dq)), flatten(args(dpdd_dqd)), flatten(args(dpdd_dqdd)), flatten(args(dpdd_dp)), flatten(args(dpdd_dpd))]),
     gentran(literal(cr)),
 
     genmat(opt[2], nbrdof, nbrdof, nbrdof, nbrdof, "M"),
     gentran(literal(cr)),
-    genmat(opt[3], nbrdof, nbrdof, nbrdof, 0, "C"),
+    genmat(opt[3], nbrdof, nbrdof, nbrdof, nbrdof, "C"),
     gentran(literal(cr)),
-    genmat(opt[3], nbrdof, nbrdof, nbrdof, nbrdof, "K"),
+    genmat(opt[3], nbrdof, nbrdof, nbrdof, 0, "K"),
     gentran(literal(cr)),
 
     if nbrdep > 0 then (
