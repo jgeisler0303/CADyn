@@ -1,6 +1,12 @@
 #include "ODEOrder2.hpp"
 #include <string>
 #include <map>
+#include <fstream>
+#include <iostream>
+#include <stdlib.h>
+#include <chrono>
+#include <cstdio>
+#include <ctime>
 
 <<gentran(literal("\/\* File generated form template cadyn2_cpp.tem on ", eval(timedate()), ". Do not edit! \*\/", cr))>>
 <<gentran(literal("\/\* Multibody system: ", eval(title), " \*\/", cr, cr))>>
@@ -23,7 +29,7 @@ public:
         ncols(ncols_)
         {}
 
-    void setParam(const double value);
+    bool setParam(const double value);
     double getParam();
     bool isSet;
     
@@ -32,8 +38,12 @@ private:
     int nrows, ncols;
 };
 
-void ParameterInfo::setParam(const double value) {
+bool ParameterInfo::setParam(const double value) {
+    bool wasSet= isSet;
+    
     data[0]= value;
+    isSet= true;
+    return wasSet;
 }
 
 double ParameterInfo::getParam() {
@@ -49,8 +59,8 @@ public:
     void setFromFile(const std::string &fileName);
     bool unsetParamsWithMsg();
     
-    int unsetParams;
     std::map<std::string, ParameterInfo> info_map;
+    int unsetParams;
     
 <<block([],
     for i:1 thru length(params) do (
@@ -85,12 +95,8 @@ void <<gentran(literal(eval(filename), "Parameters"))>>::setParam(const std::str
     if(it==info_map.end())    
         throw std::runtime_error("Unknown parameter \"" + name + "\".");
     
-    if(!it->second.isSet) {
-        it->second.isSet= true;
+    if(it->second.setParam(value))
         unsetParams--;
-    }
-    
-    it->second.setParam(value);
 }
 
 double <<gentran(literal(eval(filename), "Parameters"))>>::getParam(const std::string &name) {
@@ -155,10 +161,10 @@ public:
     
     <<gentran(literal(eval(filename), "System"))>>() : 
         ODEOrder2(nStates, nInputs, "<<gentran(literal(eval(filename)))>>", "<<gentran(literal(eval(title)))>>"),
+        param(),
         p(nbrdep),
         pd(nbrdep),
-        pdd(nbrdep),
-        param()
+        pdd(nbrdep)
         {}; 
         
     virtual VecX computeResiduals();
