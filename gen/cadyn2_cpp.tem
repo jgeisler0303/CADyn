@@ -168,7 +168,8 @@ public:
         {}; 
         
     virtual VecX computeResiduals();
-    virtual void calcJacobian(double alphaM, double alphaC, double alphaK, double tol);
+    virtual void calcJacobian(double alphaM, double alphaC, double alphaK);
+    virtual void calcB();
 <<block([], 
     if length(external) > 0 then (
         gentran(literal("    void calculateExternal()\;", cr)),
@@ -236,11 +237,7 @@ VecX <<gentran(literal(eval(filename)))>>System::computeResiduals() {
     return f_;
 }
 
-void <<gentran(literal(eval(filename)))>>System::calcJacobian(double alphaM, double alphaC, double alphaK, double tol) {
-    MatX M(nbrdof, nbrdof);
-    MatX C(nbrdof, nbrdof);
-    MatX K(nbrdof, nbrdof);
-    
+void <<gentran(literal(eval(filename)))>>System::calcJacobian(double alphaM, double alphaC, double alphaK) {
 <<block([], 
     if length(external) > 0 then (
         gentran(literal("    calculateExternalWithDeriv()\;", cr, cr))
@@ -368,5 +365,16 @@ void <<gentran(literal(eval(filename)))>>System::calcJacobian(double alphaM, dou
             Jacobian.col(idof).setZero();
         }
     }
+}
+
+void <<gentran(literal(eval(filename)))>>System::calcB() {
+<<block([opt], 
+    ?ccurrind\*: 4,
+    
+    opt: genopt([-B]),
+    gentran(literal(cr)),
+    
+    genmat(opt[1], nbrdof, nbrin, nbrdof, 0, "B")    
+)>>
 }
 

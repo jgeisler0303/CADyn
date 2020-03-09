@@ -677,12 +677,16 @@ genopt(l):= block([o, temps, replace_list, i],
         
     temps: inpart(o, 1),
 
-    replace_list: makelist(temps[i]=concat(temp, i), i, 1, length(temps)),
-
+    pre_replace_list: makelist(temps[i]=concat(temp, i), i, 1, length(temps)),
+    replace_list: [],
+    
     for i: 1 thru length(temps) do (
         if not(listp(inpart(o, i+1, 2)) or matrixp(inpart(o, i+1, 2))) then (
             gentran(literal("        double ")),
-            do_assign(concat(temp, i), subst(replace_list, inpart(o, i+1, 2)))
+            do_assign(concat(temp, i), subst(pre_replace_list, inpart(o, i+1, 2))),
+            replace_list: endcons(pre_replace_list[i], replace_list)
+        ) else (
+            replace_list: endcons(inpart(o, i+1, 1)=inpart(o, i+1, 2), replace_list)
         )
     ),
 
@@ -741,6 +745,7 @@ cagem2c2(sysdef, [target_dir]):= block([i, j, i_, j_, file, title, nbrdof, nbrbo
     
     E: make_c_index(sysdef@f_lin@E, nbrdof, nbrdep),
     A: make_c_index(sysdef@f_lin@A, nbrdof, nbrdep),
+    B: make_c_index(sysdef@f_lin@B, nbrdof, nbrdep),
     Ap: make_c_index(sysdef@f_lin@Ap, nbrdof, nbrdep),
     Apd: make_c_index(sysdef@f_lin@Apd, nbrdof, nbrdep),
     Apdd: make_c_index(sysdef@f_lin@Apdd, nbrdof, nbrdep),

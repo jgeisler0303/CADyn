@@ -22,10 +22,14 @@ public:
     void writeStateVariables(std::ostream &OutFile);
     VecX computeResidualsInt();
     virtual VecX computeResiduals()= 0;
-    virtual void calcJacobian(double alphaM, double alphaC, double alphaK, double tol);
+    virtual void calcJacobian(double alphaM, double alphaC, double alphaK);
+    virtual void calcB();
     bool staticEquilibrium();
+    bool staticEquilibriumWithLin();
     int newmarkOneStep(double h, bool hmodified= true);
     bool newmarkInterval(double tfinal, double &h, double hmax);
+    bool newmarkIntervalWithSens(double ts) { return newmarkIntervalWithSens(ts, ts); };
+    bool newmarkIntervalWithSens(double ts, double h);
     bool newmarkIntegration(double tfinal, double hsave, double hmax, AbstractIntegratorVisitor *visitor= nullptr);
 
     string name;
@@ -34,13 +38,23 @@ public:
     const int nbrdof, nbrin;
     std::vector<string> state_name;
     std::vector<string> in_name;
+    
+    MatX M;
+    MatX C;
+    MatX K;
+    MatX B;
     MatX Jacobian;
     Eigen::FullPivLU<MatX> LU;
+    MatX S;
+    
     VecX q, qd, qdd;
     VecX f;
+    
     std::vector<bool> doflocked;
     VecX u;
+    
     double t;
+    double jac_fd_tol= 1e-2;
     double AbsTol= 1E-6;
     double RelTol= 1E-6;
     double StepTol= 1E-8;

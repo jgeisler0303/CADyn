@@ -17,8 +17,13 @@ ODEOrder2::ODEOrder2(int nbrdof_, int nbrin_, const string &aname, const string 
         nbrin(nbrin_),
         state_name(nbrdof_),
         in_name(nbrin_),
+        M(nbrdof_, nbrdof_),
+        C(nbrdof_, nbrdof_),
+        K(nbrdof_, nbrdof_),
+        B(nbrdof_, nbrin_),    
         Jacobian(nbrdof_, nbrdof_),
         LU(),
+        S(2*nbrdof_, 2*nbrdof_ + nbrin_),
         q(nbrdof_),
         qd(nbrdof_),
         qdd(nbrdof_),
@@ -35,6 +40,11 @@ ODEOrder2::ODEOrder2(int nbrdof_, int nbrin_, const string &aname, const string 
             std::stringstream ss;
             ss << "q_" << i;
             state_name[i]= ss.str();
+        }
+        for(int i= 0; i<nbrin; i++) {
+            std::stringstream ss;
+            ss << "u_" << i;
+            in_name[i]= ss.str();
         }
     }
 
@@ -70,7 +80,7 @@ VecX ODEOrder2::computeResidualsInt() {
     return f;
 }
 
-void ODEOrder2::calcJacobian(double alphaM, double alphaC, double alphaK, double tol) {
+void ODEOrder2::calcJacobian(double alphaM, double alphaC, double alphaK) {
     VecX foff;
     f= computeResidualsInt();
 
@@ -79,19 +89,35 @@ void ODEOrder2::calcJacobian(double alphaM, double alphaC, double alphaK, double
         double qd_= qd[jddl];
         double qdd_= qdd[jddl];
 
-        q[jddl]+= alphaK*tol;
-        qd[jddl]+= alphaC*tol;
-        qdd[jddl]+= alphaM*tol;
+        q[jddl]+= alphaK*jac_fd_tol;
+        qd[jddl]+= alphaC*jac_fd_tol;
+        qdd[jddl]+= alphaM*jac_fd_tol;
 
         if(!doflocked[jddl]) {
             foff= computeResidualsInt();
-            Jacobian.col(jddl)= (foff - f)/tol;
+            Jacobian.col(jddl)= (foff - f)/jac_fd_tol;
         } else
             Jacobian.col(jddl).setZero();
 
         q[jddl]= q_;
         qd[jddl]= qd_;
         qdd[jddl]= qdd_;
+    }
+}
+
+void ODEOrder2::calcB() {
+    VecX foff;
+    f= computeResidualsInt();
+    
+    for(int jddl= 0; jddl < nbrin; jddl++) {
+        double u_= u[jddl];
+        
+        u[jddl]+= jac_fd_tol;
+        
+        foff= computeResidualsInt();
+        B.col(jddl)= (foff - f)/jac_fd_tol;
+        
+        u[jddl]= u_;
     }
 }
 
@@ -102,7 +128,7 @@ bool ODEOrder2::staticEquilibrium() {
     do {
         nstep++;
         if((nstep%10)==1) {
-            calcJacobian(100.0, 0.0, 1.0, 1.0E-5);
+            calcJacobian(100.0, 0.0, 1.0);
             LU.compute(Jacobian);
         } else
             f= computeResidualsInt();
@@ -116,6 +142,26 @@ bool ODEOrder2::staticEquilibrium() {
     return(nstep<=1000);
 }
 
+bool ODEOrder2::staticEquilibriumWithLin() {
+    bool res= staticEquilibrium();
+    calcJacobian(0.0, 0.0, 0.0);
+    calcB();
+    
+    // MatX Pxn1_Pxn
+    S.block(0, 0, nbrdof, nbrdof)= M;
+    // MatX Pxn1_Pdxn
+    S.block(0, nbrdof, nbrdof, nbrdof)= MatX::Identity(nbrdof, nbrdof);
+    // MatX Pdxn1_Pxn
+    S.block(nbrdof, 0, nbrdof, nbrdof)= -C;
+    // MatX Pdxn1_Pdxn
+    S.block(nbrdof, nbrdof, nbrdof, nbrdof)= -K;
+    
+    S.block(0, 2*nbrdof, nbrdof, nbrin).setZero();
+    S.block(nbrdof, 2*nbrdof, nbrdof, nbrin)= -B;
+    
+    return res;
+}    
+    
 int ODEOrder2::newmarkOneStep(double h, bool hmodified) {
     VecX qdd_sto= qdd;
     t+= h;
@@ -130,7 +176,7 @@ int ODEOrder2::newmarkOneStep(double h, bool hmodified) {
     do {
         nstep++;
         if((nstep%jac_recalc_step)==istepjac) {
-            calcJacobian(1.0, Gamma*h, Beta*h*h, 1E-2);
+            calcJacobian(1.0, Gamma*h, Beta*h*h);
             LU.compute(Jacobian);
         } else
             f= computeResidualsInt();
@@ -211,6 +257,107 @@ bool ODEOrder2::newmarkInterval(double tfinal, double &h, double hmax) {
     return true;
 }
 
+bool ODEOrder2::newmarkIntervalWithSens(double ts, double h) {
+    bool hchanged= true;
+    bool first_run= true;
+    n_steps= 0;
+    n_back_steps= 0;
+    double tfinal= t+ts;
+    
+    MatX PG_Pddxn_ddxn1(2*nbrdof, 2*nbrdof);
+    MatX PG_Pxn_dxn_u(2*nbrdof, 2*nbrdof + nbrin);
+    
+    newmarkOneStep(0.0);
+    
+    while(t < tfinal) {
+        if((t+1.4*h) >= tfinal) {
+            h= tfinal-t;
+            hchanged= true;
+        }
+        double timesto= t;
+
+        VecX q_sto= q;
+        VecX qd_sto= qd;
+        VecX qdd_sto= qdd;
+        
+        if(first_run) {
+            calcJacobian(1.0, Gamma*h, Beta*h*h);
+            calcB();
+            PG_Pddxn_ddxn1.block(0, 0, nbrdof, nbrdof)= M;
+            PG_Pxn_dxn_u.block(0, nbrdof, nbrdof, nbrdof)= C;
+            PG_Pxn_dxn_u.block(0, 0, nbrdof, nbrdof)= K;
+            PG_Pxn_dxn_u.block(0, 2*nbrdof, nbrdof, nbrin)= B;
+            
+            LU.compute(Jacobian);
+            hchanged= false;
+            first_run= false;
+        }
+        int code= newmarkOneStep(h, hchanged);
+        n_steps++;
+        hchanged= false;
+
+        if((code) || (errq>AbsTol))    {
+            if((code==1) || (code==2) || !std::isfinite(errq))
+                h*= 0.25;
+            else
+                h*= sqrt((0.21*AbsTol + 0.04*errq) / errq);
+            hchanged= true;
+            t= timesto;
+
+            q= q_sto;
+            qd= qd_sto;
+            qdd= qdd_sto;
+            if(h<hminmin)
+                return false;
+            
+            n_back_steps++;
+        } else {
+            if((errq < (0.1*AbsTol)) && (h<ts)) {
+                h*= sqrt(AbsTol/(2.1*errq + 0.04*AbsTol));
+                if(h>ts) h= ts;
+                hchanged= true;
+            }
+        }
+    }
+    
+    calcJacobian(0.0, 0.0, 0.0);
+    calcB();
+    
+    PG_Pxn_dxn_u.block(nbrdof, 0, nbrdof, nbrdof)= K;
+    PG_Pxn_dxn_u.block(nbrdof, nbrdof, nbrdof, nbrdof)= C + ts*K;
+    PG_Pxn_dxn_u.block(nbrdof, 2*nbrdof, nbrdof, nbrin)= B;
+    
+    PG_Pddxn_ddxn1.block(nbrdof, 0, nbrdof, nbrdof)= ts*(1.0-Gamma)*C + ts*ts*(0.5-Beta)*K;
+    PG_Pddxn_ddxn1.block(0, nbrdof, nbrdof, nbrdof)= MatX::Zero(nbrdof, nbrdof);
+    PG_Pddxn_ddxn1.block(nbrdof, nbrdof, nbrdof, nbrdof)= M + ts*Gamma*C + ts*ts*Beta*K;
+    
+    Eigen::ColPivHouseholderQR<MatX> invPG_Pddxn_ddxn1(PG_Pddxn_ddxn1);
+    // alternative: compute inverse via schure complement
+    
+    MatX Pddx_Pxn_dxn= -invPG_Pddxn_ddxn1.solve(PG_Pxn_dxn_u);
+    
+    #define Pddxn_Pxn   Pddx_Pxn_dxn.block(0, 0, nbrdof, nbrdof)
+    #define Pddxn1_Pxn  Pddx_Pxn_dxn.block(nbrdof, 0, nbrdof, nbrdof)
+    #define Pddxn_Pdxn  Pddx_Pxn_dxn.block(0, nbrdof, nbrdof, nbrdof)
+    #define Pddxn1_Pdxn Pddx_Pxn_dxn.block(nbrdof, nbrdof, nbrdof, nbrdof)
+    #define Pddxn_Pu  Pddx_Pxn_dxn.block(0, 2*nbrdof, nbrdof, nbrin)
+    #define Pddxn1_Pu Pddx_Pxn_dxn.block(nbrdof, 2*nbrdof, nbrdof, nbrin)
+    
+    // MatX Pxn1_Pxn
+    S.block(0, 0, nbrdof, nbrdof)= MatX::Identity(nbrdof, nbrdof) + ts*ts*((0.5-Beta)*Pddxn_Pxn + Beta*Pddxn1_Pxn);
+    // MatX Pxn1_Pdxn
+    S.block(0, nbrdof, nbrdof, nbrdof)= ts*MatX::Identity(nbrdof, nbrdof) + ts*ts*((0.5-Beta)*Pddxn_Pdxn + Beta*Pddxn1_Pdxn);
+    // MatX Pdxn1_Pxn
+    S.block(nbrdof, 0, nbrdof, nbrdof)= ts*((1.0-Gamma)*Pddxn_Pxn + Gamma*Pddxn1_Pxn);
+    // MatX Pdxn1_Pdxn
+    S.block(nbrdof, nbrdof, nbrdof, nbrdof)= MatX::Identity(nbrdof, nbrdof) + ts*((1.0-Gamma)*Pddxn_Pdxn + Gamma*Pddxn1_Pdxn);
+
+    S.block(0, 2*nbrdof, nbrdof, nbrin)= ts*ts*((0.5-Beta)*Pddxn_Pu + Beta*Pddxn1_Pu);
+    S.block(nbrdof, 2*nbrdof, nbrdof, nbrin)= ts*((1.0-Gamma)*Pddxn_Pu + Gamma*Pddxn1_Pu);
+    
+    return true;
+}
+
 bool ODEOrder2::newmarkIntegration(double tfinal, double hsave, double hmax, AbstractIntegratorVisitor *visitor) {
     t= 0.0;
     double h= 0.0;
@@ -238,20 +385,3 @@ bool ODEOrder2::newmarkIntegration(double tfinal, double hsave, double hmax, Abs
     if(visitor) visitor->finish();
     return res;
 }
-
-// void ODEOrder2::sensitivities(double ts) {
-//     
-//     
-//     MatX Pddx_Pxn= 
-//     MatX Pddx_Pdxn
-//     
-//     MatX Pddxn_Pxn= Pddx_Pxn.block(0, 0, nbrdof_, nbrdof_);
-//     MatX Pddxn1_Pxn= Pddx_Pxn.block(nbrdof_, 0, nbrdof_, nbrdof_);
-//     MatX Pddxn_Pdxn= Pddx_Pdxn.block(0, 0, nbrdof_, nbrdof_);
-//     MatX Pddxn1_Pdxn= Pddx_Pdxn.block(nbrdof_, 0, nbrdof_, nbrdof_);
-//     
-//     MatX Pxn1_Pxn= MatX::::Identity(nbrdof_, nbrdof_) + ts*ts*((0.5-Beta)*Pddxn_Pxn + Beta*Pddxn1_Pxn);
-//     MatX Pxn1_Pdxn= ts*MatX::::Identity(nbrdof_, nbrdof_) + ts*ts*((0.5-Beta)*Pddxn_Pdxn + Beta*Pddxn1_Pdxn);
-//     MatX Pdxn1_Pxn= ts*((1.0-Gamma)*Pddxn_Pxn + Gamma*Pddxn1_Pxn);
-//     MatX Pdxn1_Pdxn= MatX::::Identity(nbrdof_, nbrdof_) + ts*((0.5-Gamma)*Pddxn_Pdxn + Gamma*Pddxn1_Pdxn);
-// }

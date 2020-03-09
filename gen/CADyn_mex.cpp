@@ -21,7 +21,7 @@ bool tryGetOption(double &value, const char *name, const mxArray *mxOptions);
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     if(nrhs<4 || nrhs>6) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of arguments. Expecting (x0, dx0, u, p, {ts, {options}})"); return; }
-    if(nlhs<1 || nlhs>8) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of return values. Expecting [x, {dx, {ddx, {converged, {cpu_time, {error, {n_steps, {n_back_steps}}}}}}}]"); return; }
+    if(nlhs<1 || nlhs>9) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of return values. Expecting [x, {dx, {ddx, {sensitivity, {converged, {cpu_time, {error, {n_steps, {n_back_steps}}}}}}}}]"); return; }
     
     if(!mxIsDouble(prhs[0]) || mxGetNumberOfElements(prhs[0])!=MBSystemClass::nStates) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'x0' (%d expected)", MBSystemClass::nStates); return; }
     if(!mxIsDouble(prhs[1]) || mxGetNumberOfElements(prhs[1])!=MBSystemClass::nStates) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'dx0' (%d expected)", MBSystemClass::nStates); return; }
@@ -107,9 +107,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     
     bool res;
     if(ts==0.0)
-        res= system.staticEquilibrium();
+        res= system.staticEquilibriumWithLin();
     else
-        res= system.newmarkIntegration(ts, ts, ts, nullptr);
+        res= system.newmarkIntervalWithSens(ts);
     
     double cpu_duration = (std::clock() - startcputime) / (double)CLOCKS_PER_SEC;
     VecX q, qd, qdd;
@@ -131,29 +131,36 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     }
     
     if(nlhs>3) {
-        plhs[3]= mxCreateDoubleMatrix(1, 1, mxREAL);
-        mxGetPr(plhs[3])[0]= res;
+        plhs[3]= mxCreateDoubleMatrix(2*MBSystemClass::nStates, 2*MBSystemClass::nStates+MBSystemClass::nInputs, mxREAL);
+        for(int irow=0; irow<2*MBSystemClass::nStates; ++irow)
+            for(int icol=0; icol<2*MBSystemClass::nStates+MBSystemClass::nInputs; ++icol)
+                mxGetPr(plhs[3])[irow + icol*2*MBSystemClass::nStates]= system.S(irow, icol);
+    }
+    
+    if(nlhs>4) {
+        plhs[4]= mxCreateDoubleMatrix(1, 1, mxREAL);
+        mxGetPr(plhs[4])[0]= res;
     } else if(!res)
         mexErrMsgIdAndTxt("CADyn:Integrator", "Error in integrator");
         
-    if(nlhs>4) {
-        plhs[4]= mxCreateDoubleMatrix(1, 1, mxREAL);
-        mxGetPr(plhs[4])[0]= cpu_duration;
-    }
-    
     if(nlhs>5) {
         plhs[5]= mxCreateDoubleMatrix(1, 1, mxREAL);
-        mxGetPr(plhs[5])[0]= system.errq;
+        mxGetPr(plhs[5])[0]= cpu_duration;
     }
     
     if(nlhs>6) {
         plhs[6]= mxCreateDoubleMatrix(1, 1, mxREAL);
-        mxGetPr(plhs[6])[0]= system.n_steps;
+        mxGetPr(plhs[6])[0]= system.errq;
     }
-
+    
     if(nlhs>7) {
         plhs[7]= mxCreateDoubleMatrix(1, 1, mxREAL);
-        mxGetPr(plhs[7])[0]= system.n_back_steps;
+        mxGetPr(plhs[7])[0]= system.n_steps;
+    }
+
+    if(nlhs>8) {
+        plhs[8]= mxCreateDoubleMatrix(1, 1, mxREAL);
+        mxGetPr(plhs[8])[0]= system.n_back_steps;
     }
 }
 
