@@ -17,31 +17,31 @@ class ParameterInfo {
 public:
     ParameterInfo() :
         isSet(false),
-        data(nullptr),
         nrows(0),
-        ncols(0)
+        ncols(0),
+        data(nullptr)
         {}
         
     ParameterInfo(double *data_, int nrows_, int ncols_) :
         isSet(false),
-        data(data_),
         nrows(nrows_),
-        ncols(ncols_)
+        ncols(ncols_),
+        data(data_)
         {}
 
-    bool setParam(const double value);
+    bool setParam(const double *value);
     double getParam();
     bool isSet;
+    int nrows, ncols;
     
 private:
     double *data;
-    int nrows, ncols;
 };
 
-bool ParameterInfo::setParam(const double value) {
+bool ParameterInfo::setParam(const double *value) {
     bool wasSet= isSet;
     
-    data[0]= value;
+    memcpy(data, value, sizeof(double)*nrows*ncols);
     isSet= true;
     return wasSet;
 }
@@ -53,8 +53,7 @@ double ParameterInfo::getParam() {
 class <<gentran(literal(eval(filename), "Parameters"))>> {
 public:
     <<gentran(literal(eval(filename), "Parameters"))>>();
-    // TODO: add handling of Maxtix parameters
-    void setParam(const std::string &name, const double value);
+    void setParam(const std::string &name, const double *value);
     double getParam(const std::string &name);
     void setFromFile(const std::string &fileName);
     bool unsetParamsWithMsg();
@@ -62,7 +61,7 @@ public:
     std::map<std::string, ParameterInfo> info_map;
     int unsetParams;
     
-<<block([],
+<<block([i, dims],
     for i:1 thru length(params) do (
         if subvarp(params[i]) then (
             dims: args(params[i]),
@@ -90,7 +89,7 @@ public:
     )
 )>>}
 
-void <<gentran(literal(eval(filename), "Parameters"))>>::setParam(const std::string &name, const double value) {
+void <<gentran(literal(eval(filename), "Parameters"))>>::setParam(const std::string &name, const double *value) {
     auto it = info_map.find(name);
     if(it==info_map.end())    
         throw std::runtime_error("Unknown parameter \"" + name + "\".");
@@ -130,7 +129,7 @@ void <<gentran(literal(eval(filename), "Parameters"))>>::setFromFile(const std::
             }                
             
             try {
-                setParam(paramName, value);
+                setParam(paramName, &value);
             } catch (const std::exception& e) {
                 fprintf(stderr, "Error: %s in line %d.\n", e.what(), i);
                 continue;
@@ -159,13 +158,7 @@ public:
     static const int nInputs= <<gentran(literal(eval(nbrin)))>>;
     static const int nbrdep= <<gentran(literal(eval(nbrdep)))>>;
     
-    <<gentran(literal(eval(filename), "System"))>>() : 
-        ODEOrder2(nStates, nInputs, "<<gentran(literal(eval(filename)))>>", "<<gentran(literal(eval(title)))>>"),
-        param(),
-        p(nbrdep),
-        pd(nbrdep),
-        pdd(nbrdep)
-        {}; 
+    <<gentran(literal(eval(filename), "System"))>>(); 
         
     virtual VecX computeResiduals();
     virtual void calcJacobian(double alphaM, double alphaC, double alphaK);
@@ -184,11 +177,34 @@ private:
     
 <<block([i], 
     for i:1 thru length(external) do
-        gentran(literal("    double ", eval(external[i]), "\;", cr))
+        gentran(literal("    double ", eval(external[i]), "\;", cr)),
+        
+    for i:1 thru length(d_external) do
+        gentran(literal("    double ", eval(d_external[i]), "\;", cr))
 )>>
 };
 
 const int <<gentran(literal(eval(filename)))>>System::nbrdep;
+
+<<gentran(literal(eval(filename), "System"))>>::<<gentran(literal(eval(filename), "System"))>>() : 
+    ODEOrder2(nStates, nInputs, "<<gentran(literal(eval(filename)))>>", "<<gentran(literal(eval(title)))>>"),
+    param(),
+    p(nbrdep),
+    pd(nbrdep),
+    pdd(nbrdep)
+{
+<<block([i, i_, opt], 
+        ?ccurrind\*: 4,
+        save_subst_list: subst_list,
+        subst_list: [],
+        
+        for i:1 thru nbrin do (
+            i_: i-1,
+            do_assign(concat("in_name[", i_, "]"), concat("\"", u[i], "\""))
+        ),
+        subst_list: save_subst_list
+)>>
+}
 
 VecX <<gentran(literal(eval(filename)))>>System::computeResiduals() {
     VecX f_(nbrdof);
@@ -377,4 +393,10 @@ void <<gentran(literal(eval(filename)))>>System::calcB() {
     genmat(opt[1], nbrdof, nbrin, nbrdof, 0, "B")    
 )>>
 }
+
+<<block([], 
+    if length(external) > 0 then (
+        gentran(literal("#include \"", eval(filename), "System_Externals.hpp\""))
+    )
+)>>
 

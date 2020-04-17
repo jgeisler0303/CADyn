@@ -86,7 +86,7 @@ simplify(x):= block([s0, s1, s2, s3, s4],
 );
 
 
-defstruct(sysdef_type (file, name, nbrdof, nbrcon, nbrbody, nbrin, nbrdep, gravity, mass, IG, T0G, vG, omega, aG, omegad, vGpartial, omegapartial, vGpartial_z, omegapartial_z, elasticpartial, BodyRef, ebody, elastic_dof_idx, z_list, node_forces, pi, pdi, pddi, qi, qdi, FinalTime, StepSave, StepMax, appliedF, appliedM, appliedFe, SIMPLIFY, WITH_LINEAR, WITH_ACCELERATIONS, u, external, ext_param));
+defstruct(sysdef_type (file, name, nbrdof, nbrcon, nbrbody, nbrin, nbrdep, gravity, mass, IG, T0G, vG, omega, aG, omegad, vGpartial, omegapartial, vGpartial_z, omegapartial_z, elasticpartial, BodyRef, ebody, elastic_dof_idx, z_list, node_forces, pi, pdi, pddi, qi, qdi, FinalTime, StepSave, StepMax, appliedF, appliedM, appliedFe, SIMPLIFY, WITH_LINEAR, WITH_ACCELERATIONS, u, external, d_external, ext_param));
 defstruct(cagem_out (sys_rel, sys_abs, forces, f, constraints, params, f_lin, accelerations, outputs));
 defstruct(bodyforces_type (R, MG, Re));
 defstruct(lin_model (M, E, A, B, C, D, Ap, Apd, Apdd, dp_dq, dp_dp, dpd_dq, dpd_dqd, dpd_dp, dpd_dpd, dpdd_dq, dpdd_dqd, dpdd_dqdd, dpdd_dp, dpdd_dpd, dpdd_dpdd));
@@ -142,7 +142,7 @@ cagem(file):= block([output, i, appliedF, appliedM, appliedFe, T0G, acceleration
     ),
     
         
-output@params: listify(subset(setify(listofvars(output@f)), lambda([x], not((subvarp(x) and (op(x)=qdd or op(x)=qd or op(x)=q)) or member(x, output@sys_rel@u) or member(x, output@sys_rel@external) or x=t)))),
+output@params: listify(subset(setify(listofvars(output@f)), lambda([x], not((subvarp(x) and (op(x)=qdd or op(x)=qd or op(x)=q)) or member(x, output@sys_rel@u) or member(x, output@sys_rel@external) or member(x, output@sys_rel@d_external) or x=t)))),
     
     if output@sys_rel@WITH_ACCELERATIONS=1 then (
         output@accelerations: calcAccelerations(output@f, output@f_lin@M),
@@ -174,10 +174,10 @@ prepareKinematics(file):= block([
     filePLT, fileTEXFR, fileTEXEN, fileCPP,
     nbrbodymax, nbrdofmax, nbrdepmax, 
     i, j, j_, k, k_, f, temp, phiG, pi, pdi, pddi, p, pd, pdd, q, nbr_relative, elastic_dof_idx, 
-    SIMPLIFY, INPUTS, WITH_LINEAR, WITH_ACCELERATIONS, EXTERNAL, EXT_PARAM, 
+    SIMPLIFY, INPUTS, STATES, WITH_LINEAR, WITH_ACCELERATIONS, EXTERNAL, DEXT_VARS, EXT_VARS, EXT_PARAM, 
     title, mass, IG, gravity, T0G, TrefG, elastic_dof, ebody, BodyRef, T0Gd, R0G, R0Gd, MatRot, omega, omega_z, omega_, omegad, vG, vG_z, vG_, aG, nbrdof, nbrz, nbrbody, nbrdep, vGpartial, omegapartial, z_list: [], node_forces: [], vGpartial_z, omegapartial_z,
     qi, qdi, Ixx, Iyy, Izz, Ixy, Ixz, Iyz], 
-    local(temp, phiG, mass, IG, gravity, T0G, TrefG, elastic_dof, ebody, BodyRef, T0Gd, R0G, R0Gd, MatRot, omega, omega_z, omega_, omegad, vG, vG_z, vG_, aG, vGpartial, omegapartial, vGpartial_z, omegapartial_, qi, qdi, Ixx, Iyy, Izz, Ixy, Ixz, Iyz, pi, pdi, pddi, p, pd, pdd, q, qi, qdi, FinalTime, StepSave, StepMax, EXTERNAL, EXT_PARAM),
+    local(temp, phiG, mass, IG, gravity, T0G, TrefG, elastic_dof, ebody, BodyRef, T0Gd, R0G, R0Gd, MatRot, omega, omega_z, omega_, omegad, vG, vG_z, vG_, aG, vGpartial, omegapartial, vGpartial_z, omegapartial_, qi, qdi, Ixx, Iyy, Izz, Ixy, Ixz, Iyz, pi, pdi, pddi, p, pd, pdd, q, qi, qdi, FinalTime, StepSave, StepMax, EXTERNAL, DEXT_VARS, EXT_VARS, EXT_PARAM),
 
 
     /* Program initialization. */
@@ -200,6 +200,7 @@ prepareKinematics(file):= block([
     if WITH_ACCELERATIONS='WITH_ACCELERATIONS then WITH_ACCELERATIONS: 0,
     if WITH_LINEAR#1 then WITH_ACCELERATIONS: 0,
     if INPUTS='INPUTS then INPUTS: [],
+    if STATES='STATES then STATES: [],
     if EXTERNAL='EXTERNAL then EXTERNAL: [],
     if EXT_PARAM='EXT_PARAM then EXT_PARAM: [],
     if FinalTime='FinalTime then FinalTime: 10.0,
@@ -228,6 +229,26 @@ prepareKinematics(file):= block([
     for i:1 thru nbrdof do (
         if not(member('qi, arrays)) or not(member(i, flatten(rest(arrayinfo(qi), 2)))) then qi[i]: 0.0,
         if not(member('qdi, arrays)) or not(member(i, flatten(rest(arrayinfo(qdi), 2)))) then qdi[i]: 0.0
+    ),
+    
+    EXT_VARS: [],
+    DEXT_VARS: [],
+    kill(gradefs),
+    for i: 1 thru length(EXTERNAL) do (
+        f_name: op(EXTERNAL[i]),
+        f_args: args(EXTERNAL[i]),
+           
+        EXT_VARS: endcons(f_name, EXT_VARS),
+                                       
+        for j: 1 thru length(f_args) do (
+            if subvarp(f_args[j]) then
+                f_arg: concat(op(f_args[j]), args(f_args[j])[1])
+            else
+                f_arg: f_args[j],
+            df_darg: concat(d, f_name, "_d", f_arg),
+            gradef(f_name, f_args[j], df_darg),
+            DEXT_VARS: endcons(df_darg, DEXT_VARS)
+        )
     ),
     
     nbr_relative: 0,
@@ -529,7 +550,8 @@ prepareKinematics(file):= block([
     sysdef@WITH_LINEAR: WITH_LINEAR,
     sysdef@WITH_ACCELERATIONS: WITH_ACCELERATIONS,
     sysdef@u: INPUTS,
-    sysdef@external: EXTERNAL,
+    sysdef@external: EXT_VARS,
+    sysdef@d_external: DEXT_VARS,
     sysdef@ext_param: EXT_PARAM,
         
     sysdef
@@ -728,13 +750,15 @@ make_c_index(v, nbrdof, nbrdep):= block([v_, j, j_],
     v_
 );
 
-cagem2c2(sysdef, [target_dir]):= block([i, j, i_, j_, file, title, nbrdof, nbrbody, nbrin, nbrdep, external, params, E, A, Ap, Apd, Apdd, f, pi, pdi, pddi, dp_dq, dp_dp, dpd_dq, dpd_dqd, dpd_dp, dpd_dpd, dpdd_dq, dpdd_dqd, dpdd_dqdd, dpdd_dp, dpdd_dpd, dpdd_dpdd, qi, qdi, FinalTime, StepSave, StepMax],
+cagem2c2(sysdef, [target_dir]):= block([i, j, i_, j_, file, title, nbrdof, nbrbody, nbrin, nbrdep, external, d_external, params, E, A, Ap, Apd, Apdd, f, pi, pdi, pddi, dp_dq, dp_dp, dpd_dq, dpd_dqd, dpd_dp, dpd_dpd, dpdd_dq, dpdd_dqd, dpdd_dqdd, dpdd_dp, dpdd_dpd, dpdd_dpdd, qi, qdi, FinalTime, StepSave, StepMax],
     file: sysdef@sys_rel@file,
     title: sysdef@sys_rel@name,
     nbrdof: sysdef@sys_rel@nbrdof,
     nbrbody: sysdef@sys_rel@nbrbody,
     nbrin: sysdef@sys_rel@nbrin,
+    u: sysdef@sys_rel@u,
     external: sysdef@sys_rel@external,
+    d_external: sysdef@sys_rel@d_external,
     params: append(sysdef@params, sysdef@sys_rel@ext_param),
     nbrdep: sysdef@sys_rel@nbrdep,
     qi: sysdef@sys_abs@qi,
@@ -789,6 +813,10 @@ cagem2c2(sysdef, [target_dir]):= block([i, j, i_, j_, file, title, nbrdof, nbrbo
     ?clinelen\*: 1000,            
     gentranin(filename_merge(cagem_dir, "cadyn2_cpp.tem"), [openw(sconcat(filepath, filename, "System2.hpp"))]),
                                       
+    ext_file: sconcat(filepath, filename, "System_Externals.hpp"),
+    if file_search(ext_file)=false then
+        gentranin(filename_merge(cagem_dir, "cadyn2_external_hpp.tem"), [openw(ext_file)]),
+    
     app_file: sconcat(filepath, filename, "_app2.cpp"),
     /* if file_search(app_file)=false then */
     gentranin(filename_merge(cagem_dir, "cadyn2_cpp_app.tem"), [openw(app_file)])
@@ -806,7 +834,7 @@ crossmat(x):= block(
     matrix([0, -x[3], x[2]], [x[3], 0, -x[1]], [-x[2], x[1], 0])
 );
 
-/* TODO: add frames and ksigma */
+/* TODO: add ksigma */
 defstruct(modal (refmod, frame, I, md, Ct, Cr, Me, Gr, Oe, Ge, K, D));
 defstruct(mtaylor (order, nrow, ncol, nelem, nq, nqn, struct, M0, M1, Mn));
 defstruct(refmod (mass, nelastq, ielastq));

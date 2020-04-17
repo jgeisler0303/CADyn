@@ -1,0 +1,27 @@
+title: "Simulation of a pivoting elastic beam";
+
+/* Gravity vector */
+gravity[1]: p_g;
+gravity[2]: 0;
+gravity[3]: 0;
+
+mass[1]: p_m;
+Ixx[1]: p_I;
+Iyy[1]: p_I;
+Izz[1]: p_I;
+T0G[1]:  Trotz(q[1]).Tdisp(0, p_l, 0);
+
+
+/* Simulation parameters */
+FinalTime: 20;
+StepSave: 0.05;
+StepMax: 0.01;
+
+general_dynamics:
+    [
+    xdd[1] + 0.1*xd[1] - 1
+    ];
+
+appliedForces():= (
+    appliedM[1]: matrix([0], [0], [-p_k*q[1] - p_d*qd[1] + xd[1]])          
+);

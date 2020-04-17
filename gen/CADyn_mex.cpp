@@ -26,10 +26,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     if(!mxIsDouble(prhs[0]) || mxGetNumberOfElements(prhs[0])!=MBSystemClass::nStates) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'x0' (%d expected)", MBSystemClass::nStates); return; }
     if(!mxIsDouble(prhs[1]) || mxGetNumberOfElements(prhs[1])!=MBSystemClass::nStates) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'dx0' (%d expected)", MBSystemClass::nStates); return; }
     // TODO: enable more than on sim step
-    if(!mxIsDouble(prhs[2]) || mxGetNumberOfElements(prhs[1])!=MBSystemClass::nInputs) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'u' (%d expected)", MBSystemClass::nInputs); return; }
+    if(!mxIsDouble(prhs[2]) || mxGetNumberOfElements(prhs[2])!=MBSystemClass::nInputs) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'u' (%d expected)", MBSystemClass::nInputs); return; }
     
     if(nrhs>=5)
-        if(!mxIsDouble(prhs[4]) || mxGetNumberOfElements(prhs[3])!=1) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'ts' (1 expected)"); return; }
+        if(!mxIsDouble(prhs[4]) || mxGetNumberOfElements(prhs[4])!=1) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'ts' (1 expected)"); return; }
     
     const mxArray *mxParams= prhs[3];
     if(!mxIsStruct(mxParams) || mxGetNumberOfElements(mxParams)!=1) {
@@ -53,14 +53,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
             mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Required parameter '%s' is not member of parameters struct.\n", iter.first.c_str());
             return;
         }
-        // for now, only scalar parameters supported
         int m_= mxGetM(mxParam);
         int n_= mxGetN(mxParam);
-        if(mxIsSparse(mxParam) || !mxIsDouble(mxParam) || (m_!=1 && n_!=1)) {
-            mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Parameter name '%s' must be a vector length %d.\n", iter.first.c_str(), 1);
+        if(mxIsSparse(mxParam) || !mxIsDouble(mxParam) || m_!=iter.second.nrows || n_!=iter.second.ncols) {
+            mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Parameter name '%s' must be a %dx%d matrix.\n", iter.first.c_str(), iter.second.nrows, iter.second.ncols);
             return;
         }
-        system.param.setParam(iter.first.c_str(), mxGetPr(mxParam)[0]);
+        system.param.setParam(iter.first.c_str(), mxGetPr(mxParam));
     }
     
     if(nrhs>=6) {
