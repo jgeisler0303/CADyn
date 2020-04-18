@@ -814,8 +814,16 @@ cagem2c2(sysdef, [target_dir]):= block([i, j, i_, j_, file, title, nbrdof, nbrbo
     gentranin(filename_merge(cagem_dir, "cadyn2_cpp.tem"), [openw(sconcat(filepath, filename, "System2.hpp"))]),
                                       
     ext_file: sconcat(filepath, filename, "System_Externals.hpp"),
-    if file_search(ext_file)=false then
-        gentranin(filename_merge(cagem_dir, "cadyn2_external_hpp.tem"), [openw(ext_file)]),
+    if file_search(ext_file)=false then (
+        ext_file_source: sconcat(pathname_directory(file), filename, "System_Externals.hpp"),
+        
+        if not(file_search(ext_file_source)=false) then (
+            load(operatingsystem),
+            copy_file(ext_file_source, ext_file)
+        ) else (
+            gentranin(filename_merge(cagem_dir, "cadyn2_external_hpp.tem"), [openw(ext_file)])
+        )
+    ),
     
     app_file: sconcat(filepath, filename, "_app2.cpp"),
     /* if file_search(app_file)=false then */
