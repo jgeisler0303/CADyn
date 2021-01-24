@@ -121,15 +121,37 @@ void <<gentran(literal(eval(filename), "Parameters"))>>::setFromFile(const std::
             if(paramName.empty() || (paramName[0]=='*' || paramName[0]=='#')) // comment or empty line
                 continue;
             
-            double value;
-            iss >> value;
-            if(iss.fail()) {
-                fprintf(stderr, "Could not read value for parameter \"%s\" in line %d.\n", paramName.c_str(), i);
-                continue;
-            }                
+            auto it = info_map.find(paramName);
+            if(it==info_map.end())    
+                throw std::runtime_error("Unknown parameter \"" + paramName + "\".");
+            
+            Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> value(it->second.nrows, it->second.ncols);
+            bool fail= false;
+            
+            for(int r= 0; r<it->second.nrows; ++r) {
+                if(r>0) {
+                    if(!std::getline(infile, line)) {
+                        fprintf(stderr, "Out of lines while reading parameter \"%s(%d, 1)\".\n", paramName.c_str(), r);                   
+                        fail= true;
+                        break;
+                    }
+                    ++i;
+                    iss.str(line);
+                }                    
+                for(int c= 0; c<it->second.ncols; ++c) {
+                    iss >> value(r, c);
+                    if(iss.fail()) {
+                        fprintf(stderr, "Could not read value for parameter \"%s(%d, %d)\" in line %d.\n", paramName.c_str(), r, c, i);
+                        fail= true;
+                        break;
+                    }                
+                }
+                if(fail) break;
+            }
+            if(fail) continue;
             
             try {
-                setParam(paramName, &value);
+                setParam(paramName, value.data());
             } catch (const std::exception& e) {
                 fprintf(stderr, "Error: %s in line %d.\n", e.what(), i);
                 continue;
@@ -138,7 +160,7 @@ void <<gentran(literal(eval(filename), "Parameters"))>>::setFromFile(const std::
     } else
         throw std::runtime_error("Could not open file \"" + fileName + "\"");
 }   
-
+    
 bool <<gentran(literal(eval(filename), "Parameters"))>>::unsetParamsWithMsg() {
     if(unsetParams) {
         fprintf(stderr, "The following parameters are not set:\n");
@@ -172,7 +194,7 @@ public:
     
     <<gentran(literal(eval(filename), "Parameters"))>> param;
     
-private:
+// private:
     VecX p, pd, pdd;
     
 <<block([i], 

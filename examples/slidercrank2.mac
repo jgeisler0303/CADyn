@@ -1,0 +1,36 @@
+title: "Simulation of a slider-crank mechanism";
+
+WITH_LINEAR: 1;
+
+/* Gravity vector */
+gravity[1]: 0;
+gravity[2]: 0;
+gravity[3]: 0;
+
+/* Inertia characteristics */
+mass[1]: m1;
+mass[2]: m2;
+mass[3]: m3;
+Ixx[1]: 1;
+Iyy[1]: 1;
+Izz[1]: I1;
+Ixx[2]: 1;
+Iyy[2]: 1;
+Izz[2]: I2;
+Ixx[3]: 1;
+Iyy[3]: 1;
+Izz[3]: I3;
+
+/* Intermediary variables for the kinematics */
+alpha :  asin(lc*sin(q[1])/lr);
+x3 :  lc*cos(q[1]) + lr*cos(alpha);
+
+/* Definition of the homogeneous transformation matrices */
+T0G[1]:  Trotz(q[1]);
+T0G[2] :  Tdisp(x3,0,0) . Trotz(-alpha) . Tdisp(-lr/2,0,0);
+T0G[3] :  Tdisp(x3,0,0);
+
+appliedForces():= (
+    appliedM[1]: matrix([0], [0], [M]),
+    appliedF[3]: matrix([F], [0], [0])
+);

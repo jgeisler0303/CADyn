@@ -16,6 +16,7 @@
 
 cagem_dir: load_pathname;
 
+load(lrats);
 
 unitX: transpose(matrix([1, 0, 0]));
 unitY: transpose(matrix([0, 1, 0]));
@@ -51,8 +52,8 @@ Tdisp(x,y,z):= block([Toi],
 
 Telast(nbody, nframe):= block([Toi, xyz, ori, z_elast],
     z_elast: [concat(z_elast_, nbody, '_, nframe)[1], concat(z_elast_, nbody, '_, nframe)[2], concat(z_elast_, nbody, '_, nframe)[3]],
-    xyz: ebody[nbody]@frame[nframe]@origin@M0 + apply("+", makelist(ebody[nbody]@frame[nframe]@origin@M1[i]*elastic_dof[nbody][i], i, 1, length(elastic_dof[nbody]))),
-    ori: ebody[nbody]@frame[nframe]@ap@M0 + apply("+", makelist(ebody[nbody]@frame[nframe]@ap@M1[i]*elastic_dof[nbody][i], i, 1, length(elastic_dof[nbody]))),
+    xyz: ebody[nbody]@frame[nframe]@origin@M0 + apply("+", makelist(eps*ebody[nbody]@frame[nframe]@origin@M1[i]*elastic_dof[nbody][i], i, 1, length(elastic_dof[nbody]))),
+    ori: ident(3) + apply("+", makelist(eps*eps_rot*ebody[nbody]@frame[nframe]@ap@M1[i]*elastic_dof[nbody][i], i, 1, length(elastic_dof[nbody]))),
 
     z_list: append(z_list, z_elast),
     node_forces: endcons([nbody, nframe, concat(z_elast_, nbody, '_, nframe)], node_forces), 
@@ -76,7 +77,7 @@ exp_size(expr):= length(flatten(decomp(expr)));
 /* simplify(x):= block([s0, s1, s2], s0: eval_string(string(ev(x, float))), s1: ratsimp(trigreduce(trigsimp(s0))), s2: ratsimp(trigsimp(s0)), if exp_size(s1)>exp_size(s2) then s2 else s1); */
 /* simplify(x):= block([s0, s1, s2, s3], s0: x, s1: ratsimp(trigreduce(trigsimp(s0))), s2: ratsimp(trigsimp(s0)), if exp_size(s1)>exp_size(s2) then s3: s2 else s3:s1, ev(s3, float)); */
 simplify(x):= block([s0, s1, s2, s3, s4], 
-    s0: trigsimp(x),
+    s0: trigsimp(fullratsubst([eps_rot^2=0], x)),
     s1: ratsimp(trigreduce(s0)),
     s2: ratsimp(s0),
     if exp_size(s1)>exp_size(s2) then s3: s2 else s3:s1,
@@ -86,7 +87,7 @@ simplify(x):= block([s0, s1, s2, s3, s4],
 );
 
 
-defstruct(sysdef_type (file, name, nbrdof, nbrcon, nbrbody, nbrin, nbrdep, gravity, mass, IG, T0G, vG, omega, aG, omegad, vGpartial, omegapartial, vGpartial_z, omegapartial_z, elasticpartial, BodyRef, ebody, elastic_dof_idx, z_list, node_forces, pi, pdi, pddi, qi, qdi, FinalTime, StepSave, StepMax, appliedF, appliedM, appliedFe, SIMPLIFY, WITH_LINEAR, WITH_ACCELERATIONS, u, external, d_external, ext_param));
+defstruct(sysdef_type (file, name, nbrdof, nbrcon, nbrbody, nbrin, nbrdep, gravity, mass, IG, T0G, vG, omega, aG, omegad, vGpartial, omegapartial, vGpartial_z, omegapartial_z, elasticpartial, BodyRef, ebody, elastic_dof_idx, z_list, node_forces, pi, pdi, pddi, qi, qdi, FinalTime, StepSave, StepMax, appliedF, appliedM, appliedFe, SIMPLIFY, SMALL_ELAST, WITH_LINEAR, WITH_ACCELERATIONS, u, external, d_external, ext_param));
 defstruct(cagem_out (sys_rel, sys_abs, forces, f, constraints, params, f_lin, accelerations, outputs));
 defstruct(bodyforces_type (R, MG, Re));
 defstruct(lin_model (M, E, A, B, C, D, Ap, Apd, Apdd, dp_dq, dp_dp, dpd_dq, dpd_dqd, dpd_dp, dpd_dpd, dpdd_dq, dpdd_dqd, dpdd_dqdd, dpdd_dp, dpdd_dpd, dpdd_dpdd));
@@ -96,7 +97,9 @@ cagem(file):= block([output, i, appliedF, appliedM, appliedFe, T0G, acceleration
 
     output@sys_rel: prepareKinematics(file),
     output@sys_abs: composeMotion(output@sys_rel),
+    print("Done with composeMotion"),
     output@forces: computeForceBalance(output@sys_abs),
+    print("Done with computeForceBalance"),
     
     appliedForcesZero(output@sys_abs),
     for i:1 thru output@sys_abs@nbrbody do T0G[i]: output@sys_abs@T0G[i],
@@ -109,8 +112,11 @@ cagem(file):= block([output, i, appliedF, appliedM, appliedFe, T0G, acceleration
     ),
     
     output@f: generalizedBalance(output@sys_abs, output@forces),
+    print("Done with generalizedBalance"),
     output@constraints: constraintForces(output@sys_abs, output@forces, [z]),
-                    
+    print("Done with constraintForces"),
+    output@f: simplify(expand(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0], expand(output@f))))),
+    
     if output@sys_abs@SIMPLIFY=1 then (
         output@f: simplify(output@f),
         output@constraints: simplify(output@constraints)
@@ -142,7 +148,7 @@ cagem(file):= block([output, i, appliedF, appliedM, appliedFe, T0G, acceleration
     ),
     
         
-output@params: listify(subset(setify(listofvars(output@f)), lambda([x], not((subvarp(x) and (op(x)=qdd or op(x)=qd or op(x)=q)) or member(x, output@sys_rel@u) or member(x, output@sys_rel@external) or member(x, output@sys_rel@d_external) or x=t)))),
+    output@params: listify(subset(setify(listofvars(output@f)), lambda([x], not((subvarp(x) and (op(x)=qdd or op(x)=qd or op(x)=q)) or member(x, output@sys_rel@u) or member(x, output@sys_rel@external) or member(x, output@sys_rel@d_external) or x=t)))),
     
     if output@sys_rel@WITH_ACCELERATIONS=1 then (
         output@accelerations: calcAccelerations(output@f, output@f_lin@M),
@@ -174,7 +180,7 @@ prepareKinematics(file):= block([
     filePLT, fileTEXFR, fileTEXEN, fileCPP,
     nbrbodymax, nbrdofmax, nbrdepmax, 
     i, j, j_, k, k_, f, temp, phiG, pi, pdi, pddi, p, pd, pdd, q, nbr_relative, elastic_dof_idx, 
-    SIMPLIFY, INPUTS, STATES, WITH_LINEAR, WITH_ACCELERATIONS, EXTERNAL, DEXT_VARS, EXT_VARS, EXT_PARAM, 
+    SIMPLIFY, SMALL_ELAST,INPUTS, STATES, WITH_LINEAR, WITH_ACCELERATIONS, EXTERNAL, DEXT_VARS, EXT_VARS, EXT_PARAM, 
     title, mass, IG, gravity, T0G, TrefG, elastic_dof, ebody, BodyRef, T0Gd, R0G, R0Gd, MatRot, omega, omega_z, omega_, omegad, vG, vG_z, vG_, aG, nbrdof, nbrz, nbrbody, nbrdep, vGpartial, omegapartial, z_list: [], node_forces: [], vGpartial_z, omegapartial_z,
     qi, qdi, Ixx, Iyy, Izz, Ixy, Ixz, Iyz], 
     local(temp, phiG, mass, IG, gravity, T0G, TrefG, elastic_dof, ebody, BodyRef, T0Gd, R0G, R0Gd, MatRot, omega, omega_z, omega_, omegad, vG, vG_z, vG_, aG, vGpartial, omegapartial, vGpartial_z, omegapartial_, qi, qdi, Ixx, Iyy, Izz, Ixy, Ixz, Iyz, pi, pdi, pddi, p, pd, pdd, q, qi, qdi, FinalTime, StepSave, StepMax, EXTERNAL, DEXT_VARS, EXT_VARS, EXT_PARAM),
@@ -196,6 +202,7 @@ prepareKinematics(file):= block([
 
     /* Option flags initialization. */
     if SIMPLIFY='SIMPLIFY then SIMPLIFY: 1,
+    if SMALL_ELAST='SMALL_ELAST then SMALL_ELAST: 0,
     if WITH_LINEAR='WITH_LINEAR then WITH_LINEAR: 1,
     if WITH_ACCELERATIONS='WITH_ACCELERATIONS then WITH_ACCELERATIONS: 0,
     if WITH_LINEAR#1 then WITH_ACCELERATIONS: 0,
@@ -214,7 +221,7 @@ prepareKinematics(file):= block([
     nbrz: max(lmax(flatten(map(args, sublist(listofvars([listarray(T0G), listarray(TrefG)]), lambda([x], subvarp(x) and op(x)='z))))), 0),
     for i: 1 thru nbrz do z_list: endcons(z[i], z_list),
     if member('pi, arrays) then nbrdep: lmax(flatten(rest(arrayinfo(pi), 2))) else nbrdep: 0,
-    if not(member(gravity, arrays)) then gravity: [0.0, 0.0, -9.81],
+    if gravity='gravity then gravity: [0.0, 0.0, -9.81],
     nbrin: length(INPUTS),
             
     IG: makelist(zeromatrix(3, 3), i, 1, nbrbody),
@@ -520,16 +527,16 @@ prepareKinematics(file):= block([
     sysdef@gravity: makelist(gravity[i], i, 1, 3),
     sysdef@mass: makelist(mass[i], i, 1, nbrbody),
     sysdef@IG: makelist(IG[i], i, 1, nbrbody),
-    sysdef@T0G: makelist(T0G[i], i, 1, nbrbody),
-    sysdef@vG: makelist(vG[i], i, 1, nbrbody),
-    sysdef@omega: makelist(omega[i], i, 1, nbrbody),
-    sysdef@aG: makelist(aG[i], i, 1, nbrbody),
-    sysdef@omegad: makelist(omegad[i], i, 1, nbrbody),
-    sysdef@vGpartial: makelist(makelist(vGpartial[i, j], j, 1, nbrdof), i, 1, nbrbody),
-    sysdef@vGpartial_z: makelist(makelist(vGpartial_z[i, j], j, 1, length(z_list)), i, 1, nbrbody),
+    sysdef@T0G: makelist(simplify(T0G[i]), i, 1, nbrbody),
+    sysdef@vG: makelist(simplify(vG[i]), i, 1, nbrbody),
+    sysdef@omega: makelist(simplify(omega[i]), i, 1, nbrbody),
+    sysdef@aG: makelist(simplify(aG[i]), i, 1, nbrbody),
+    sysdef@omegad: makelist(simplify(omegad[i]), i, 1, nbrbody),
+    sysdef@vGpartial: makelist(makelist(simplify(vGpartial[i, j]), j, 1, nbrdof), i, 1, nbrbody),
+    sysdef@vGpartial_z: makelist(makelist(simplify(vGpartial_z[i, j]), j, 1, length(z_list)), i, 1, nbrbody),
     sysdef@elasticpartial: makelist([], i, 1, nbrbody),
-    sysdef@omegapartial: makelist(makelist(omegapartial[i, j], j, 1, nbrdof), i, 1, nbrbody),
-    sysdef@omegapartial_z: makelist(makelist(omegapartial_z[i, j], j, 1, length(z_list)), i, 1, nbrbody),
+    sysdef@omegapartial: makelist(makelist(simplify(omegapartial[i, j]), j, 1, nbrdof), i, 1, nbrbody),
+    sysdef@omegapartial_z: makelist(makelist(simplify(omegapartial_z[i, j]), j, 1, length(z_list)), i, 1, nbrbody),
     sysdef@z_list: makelist(z_list[i], i, 1, length(z_list)),
     sysdef@node_forces: makelist(node_forces[i], i, 1, length(node_forces)),
     sysdef@BodyRef: makelist(BodyRef[i], i, 1, nbrbody),
@@ -547,6 +554,7 @@ prepareKinematics(file):= block([
     sysdef@appliedM: makelist(appliedM[i], i, 1, nbrbody),
     sysdef@appliedFe: makelist(appliedFe[i], i, 1, nbrbody),
     sysdef@SIMPLIFY: SIMPLIFY,
+    sysdef@SMALL_ELAST: SMALL_ELAST,
     sysdef@WITH_LINEAR: WITH_LINEAR,
     sysdef@WITH_ACCELERATIONS: WITH_ACCELERATIONS,
     sysdef@u: INPUTS,
@@ -824,6 +832,8 @@ cagem2c2(sysdef, [target_dir]):= block([i, j, i_, j_, file, title, nbrdof, nbrbo
             gentranin(filename_merge(cagem_dir, "cadyn2_external_hpp.tem"), [openw(ext_file)])
         )
     ),
+
+    gentranin(filename_merge(cagem_dir, "model_parameters.m.tem"), [openw(sconcat(filepath, "model_parameters.m"))]),
     
     app_file: sconcat(filepath, filename, "_app2.cpp"),
     /* if file_search(app_file)=false then */
@@ -1068,16 +1078,16 @@ calcElasticModeLumpedPrecomputed(PHI, rr, mm):= block([b, i, iPHI, jPHI, md, Ct,
     b
 );
 
-evalModalTaylor(t, edof_idx):= block([r, i, j],
+evalModalTaylor(t, edof_idx, eps):= block([r, i, j],
     r: copy(t@M0),
     
     if t@order>0 then
         for i: 1 thru t@nq do
             if t@nelem>0 then (
                 for j: 1 thru t@nelem do
-                    r[j]: r[j] + t@M1[i][j]*q[edof_idx[i]]
+                    r[j]: r[j] + t@M1[i][j]*q[edof_idx[i]]*eps /* eps? */
             ) else
-                r: r + t@M1[i]*q[edof_idx[i]],
+                r: r + t@M1[i]*q[edof_idx[i]]*eps, /* eps? */
             
     r
 );
@@ -1113,11 +1123,11 @@ composeMotion(sysdef):= block([erel, vrel, vrel_z, arel, wrel, wrel_z, wdrel, vG
             wrel: simplify_(submatrix(4, sysout@T0G[sysout@BodyRef[i]], 4) . sysout@omega[i]),
             wdrel: simplify_(submatrix(4, sysout@T0G[sysout@BodyRef[i]], 4) . sysout@omegad[i]),
 
-            sysout@T0G[i]: simplify_(sysout@T0G[sysout@BodyRef[i]] . sysout@T0G[i]),
-            sysout@vG[i]: simplify_(sysout@vG[sysout@BodyRef[i]] + crossmat(sysout@omega[sysout@BodyRef[i]]) . erel + vrel),
-            sysout@omega[i]: simplify_(sysout@omega[sysout@BodyRef[i]] + wrel),
-            sysout@aG[i]: simplify_(sysout@aG[sysout@BodyRef[i]] + crossmat(sysout@omegad[sysout@BodyRef[i]]) . erel + crossmat(sysout@omega[sysout@BodyRef[i]]) . (crossmat(sysout@omega[sysout@BodyRef[i]]) . erel) + 2.0*crossmat(sysout@omega[sysout@BodyRef[i]]) . vrel + arel),
-            sysout@omegad[i]: simplify_(sysout@omegad[sysout@BodyRef[i]] + crossmat(sysout@omega[sysout@BodyRef[i]]) . wrel + wdrel),
+            sysout@T0G[i]: simplify(sysout@T0G[sysout@BodyRef[i]] . sysout@T0G[i]),
+            sysout@vG[i]: simplify(sysout@vG[sysout@BodyRef[i]] + crossmat(sysout@omega[sysout@BodyRef[i]]) . erel + vrel),
+            sysout@omega[i]: simplify(sysout@omega[sysout@BodyRef[i]] + wrel),
+            sysout@aG[i]: simplify(sysout@aG[sysout@BodyRef[i]] + crossmat(sysout@omegad[sysout@BodyRef[i]]) . erel + crossmat(sysout@omega[sysout@BodyRef[i]]) . (crossmat(sysout@omega[sysout@BodyRef[i]]) . erel) + 2.0*crossmat(sysout@omega[sysout@BodyRef[i]]) . vrel + arel),
+            sysout@omegad[i]: simplify(sysout@omegad[sysout@BodyRef[i]] + crossmat(sysout@omega[sysout@BodyRef[i]]) . wrel + wdrel),
     
             vGpartial: zeromatrix(3, 0),
             omegapartial: zeromatrix(3, 0),
@@ -1129,8 +1139,8 @@ composeMotion(sysdef):= block([erel, vrel, vrel_z, arel, wrel, wrel_z, wdrel, vG
                 vGpartial: simplify_(addcol(vGpartial, col(sysout@vGpartial[sysout@BodyRef[i]], j) + crossmat(col(sysout@omegapartial[sysout@BodyRef[i]], j)) . erel + vrel)),
                 omegapartial: simplify_(addcol(omegapartial, col(sysout@omegapartial[sysout@BodyRef[i]], j) + wrel))
             ),
-            sysout@vGpartial[i]: vGpartial,
-            sysout@omegapartial[i]: omegapartial,
+            sysout@vGpartial[i]: simplify(subst([eps=1], vGpartial)),
+            sysout@omegapartial[i]: simplify(subst([eps=1], omegapartial)),
             
             for j: 1 thru sysout@nbrcon do (
                 vrel_z: simplify_(submatrix(4, sysout@T0G[sysout@BodyRef[i]], 4) . col(sysout@vGpartial_z[i], j)),
@@ -1138,23 +1148,25 @@ composeMotion(sysdef):= block([erel, vrel, vrel_z, arel, wrel, wrel_z, wdrel, vG
                 vGpartial_z: simplify_(addcol(vGpartial_z, col(sysout@vGpartial_z[sysout@BodyRef[i]], j) + crossmat(col(sysout@omegapartial_z[sysout@BodyRef[i]], j)) . erel + vrel_z)),
                 omegapartial_z: simplify_(addcol(omegapartial_z, col(sysout@omegapartial_z[sysout@BodyRef[i]], j) + wrel_z))
             ),
-            sysout@vGpartial_z[i]: vGpartial_z,
-            sysout@omegapartial_z[i]: omegapartial_z
+            sysout@vGpartial_z[i]: simplify(subst([eps=1], vGpartial_z)),
+            sysout@omegapartial_z[i]: simplify(subst([eps=1], omegapartial_z))
         ),
         
         for iedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
             elasticpartial: addrow(elasticpartial, zeromatrix(1, sysout@nbrdof)),
             elasticpartial[iedof, sysout@elastic_dof_idx[i][iedof]]: 1
         ),
-        sysout@elasticpartial[i]: elasticpartial
+        sysout@elasticpartial[i]: simplify(subst([eps=1], elasticpartial))
     ),
     
     sysout
 );
 
 
-computeForceBalance(sysdef):= block([R, MG, PhiG_local, aG_local, omegad_local, omega_local, R_local, MG_local, Re, Ct, Cr, Ct_, Gr, Gr_, w, Ge, Ge_, K, D, grav_local],
+computeForceBalance(sysdef):= block([R, MG, PhiG_local, aG_local, omegad_local, omega_local, R_local, MG_local, Re, Ct, Cr, Ct_, Gr, Gr_, w, Ge, Ge_, K, D, grav_local, eps],
     bodyforces: new(bodyforces_type),
+    if sysdef@SMALL_ELAST=0 then
+        eps: 1,
     
     for i: 1 thru sysdef@nbrbody do (
         if sysout@ebody[i] = ebody[i] then (
@@ -1170,59 +1182,62 @@ computeForceBalance(sysdef):= block([R, MG, PhiG_local, aG_local, omegad_local, 
             omega_local: simplify_(transpose(submatrix(4, sysdef@T0G[i], 4)) . sysdef@omega[i]),
 
             R_local: simplify_(- sysdef@ebody[i]@refmod@mass * aG_local),
-            R_local: simplify_(R_local - crossmat(omegad_local) . evalModalTaylor(sysdef@ebody[i]@md, sysdef@elastic_dof_idx[i])),
-            Ct: evalModalTaylor(sysdef@ebody[i]@Ct, sysdef@elastic_dof_idx[i]),
+            R_local: simplify_(R_local - crossmat(omegad_local) . evalModalTaylor(sysdef@ebody[i]@md, sysdef@elastic_dof_idx[i], eps)),
+            Ct: evalModalTaylor(sysdef@ebody[i]@Ct, sysdef@elastic_dof_idx[i], eps),
             for iedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
-                R_local: R_local - transpose(row(Ct, iedof)) * qdd[sysout@elastic_dof_idx[i][iedof]]
+                R_local: R_local - transpose(row(Ct, iedof)) * qdd[sysout@elastic_dof_idx[i][iedof]]*eps
             ),
             
-            MG_local: simplify_(- evalModalTaylor(sysdef@ebody[i]@I, sysdef@elastic_dof_idx[i]) . omegad_local),
-            MG_local: simplify_(MG_local - crossmat(evalModalTaylor(sysdef@ebody[i]@md, sysdef@elastic_dof_idx[i])) . aG_local),
-            Cr: evalModalTaylor(sysdef@ebody[i]@Cr, sysdef@elastic_dof_idx[i]),
+            MG_local: simplify_(- evalModalTaylor(sysdef@ebody[i]@I, sysdef@elastic_dof_idx[i], eps) . omegad_local),
+            MG_local: simplify_(MG_local - crossmat(evalModalTaylor(sysdef@ebody[i]@md, sysdef@elastic_dof_idx[i], eps)) . aG_local),
+            Cr: evalModalTaylor(sysdef@ebody[i]@Cr, sysdef@elastic_dof_idx[i], eps),
             for iedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
-                MG_local: MG_local - transpose(row(Cr, iedof)) * qdd[sysout@elastic_dof_idx[i][iedof]]
+                MG_local: MG_local - transpose(row(Cr, iedof)) * qdd[sysout@elastic_dof_idx[i][iedof]]*eps
             ),
             for iedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
                 Re[i][iedof, 1]: simplify_(- row(Ct, iedof) . aG_local),
                 Re[i][iedof, 1]: simplify_(Re[i][iedof, 1] - row(Cr, iedof) . omegad_local),
                 for jedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
-                    Re[i][iedof, 1]: simplify_(Re[i][iedof, 1] - sysdef@ebody[i]@Me@M0[iedof, jedof] * qdd[sysout@elastic_dof_idx[i][jedof]])
+                    Re[i][iedof, 1]: simplify_(Re[i][iedof, 1] - sysdef@ebody[i]@Me@M0[iedof, jedof] * qdd[sysout@elastic_dof_idx[i][jedof]]*eps)
                 )
             ),
-            R_local: R_local - simplify_(crossmat(omega_local) . (crossmat(evalModalTaylor(sysdef@ebody[i]@md, sysdef@elastic_dof_idx[i])) . omega_local)),
+            /* R_local: R_local - simplify_(sysdef@ebody[i]@refmod@mass * crossmat(omega_local) . vG_local), */
+            R_local: R_local - simplify_(crossmat(omega_local) . (crossmat(omega_local) . evalModalTaylor(sysdef@ebody[i]@md, sysdef@elastic_dof_idx[i], eps))),
             Ct_: zeromatrix(3, 1),
             for iedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
-                Ct_: Ct_ + transpose(row(Ct, iedof)) * qd[sysout@elastic_dof_idx[i][iedof]]
+                Ct_: Ct_ + transpose(row(Ct, iedof)) * qd[sysout@elastic_dof_idx[i][iedof]]*eps
             ),
             R_local: R_local - simplify_(2 * crossmat(omega_local) . Ct_),
 
-            MG_local: MG_local - simplify_(crossmat(omega_local) . (evalModalTaylor(sysdef@ebody[i]@I, sysdef@elastic_dof_idx[i]) . omega_local)),
+            /* MG_local: MG_local - simplify_(crossmat(evalModalTaylor(sysdef@ebody[i]@md, sysdef@elastic_dof_idx[i], eps)) . crossmat(omega_local) . vG_local), */
+            MG_local: MG_local - simplify_(crossmat(omega_local) . (evalModalTaylor(sysdef@ebody[i]@I, sysdef@elastic_dof_idx[i], eps) . omega_local)),
             Gr_: zeromatrix(3, 3),
-            Gr: evalModalTaylor(sysdef@ebody[i]@Gr, sysdef@elastic_dof_idx[i]),
+            Gr: evalModalTaylor(sysdef@ebody[i]@Gr, sysdef@elastic_dof_idx[i], eps),
             for iedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
-                Gr_: Gr_ + Gr[iedof] * qd[sysout@elastic_dof_idx[i][iedof]]
+                Gr_: Gr_ + Gr[iedof] * qd[sysout@elastic_dof_idx[i][iedof]]*eps
             ),
             MG_local: MG_local - simplify_(Gr_ . omega_local),
 
+            /* Re[i]: Re[i] - simplify_(Ct . crossmat(omega_local) . vG_local), */
             w: matrix([omega_local[1, 1]*omega_local[1, 1], omega_local[2, 1]*omega_local[2, 1], omega_local[3, 1]*omega_local[3, 1], omega_local[1, 1]*omega_local[2, 1], omega_local[2, 1]*omega_local[3, 1], omega_local[1, 1]*omega_local[3, 1]]),
-            Re[i]: Re[i] - simplify_(evalModalTaylor(sysdef@ebody[i]@Oe, sysdef@elastic_dof_idx[i]) . transpose(w)),
+            Re[i]: Re[i] - simplify_(evalModalTaylor(sysdef@ebody[i]@Oe, sysdef@elastic_dof_idx[i], eps) . transpose(w)),
 
-            Ge: evalModalTaylor(sysdef@ebody[i]@Ge, sysdef@elastic_dof_idx[i]),
+            Ge: evalModalTaylor(sysdef@ebody[i]@Ge, sysdef@elastic_dof_idx[i], eps),
             for iedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
                 Ge_: zeromatrix(3, 1),
                 for jedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
                     /* TODO: check for correct order of jedof and iedof */
-                    Ge_: Ge_ + transpose(row(Ge[jedof], iedof)) * qd[sysout@elastic_dof_idx[i][jedof]]
+                    Ge_: Ge_ + transpose(row(Ge[jedof], iedof)) * qd[sysout@elastic_dof_idx[i][jedof]]*eps
                 ),
                 Re[i][iedof, 1]: Re[i][iedof, 1] - simplify_(transpose(Ge_) . omega_local)
             ),
 
-            K: evalModalTaylor(sysdef@ebody[i]@K, sysdef@elastic_dof_idx[i]),
-            D: evalModalTaylor(sysdef@ebody[i]@D, sysdef@elastic_dof_idx[i]),
+            K: evalModalTaylor(sysdef@ebody[i]@K, sysdef@elastic_dof_idx[i], eps),
+            D: evalModalTaylor(sysdef@ebody[i]@D, sysdef@elastic_dof_idx[i], eps),
             for iedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
                 for jedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
-                    Re[i][iedof, 1]: Re[i][iedof, 1] - K[iedof, jedof] * q[sysout@elastic_dof_idx[i][jedof]],
-                    Re[i][iedof, 1]: Re[i][iedof, 1] - D[iedof, jedof] * qd[sysout@elastic_dof_idx[i][jedof]]
+                    Re[i][iedof, 1]: Re[i][iedof, 1] - K[iedof, jedof] * q[sysout@elastic_dof_idx[i][jedof]]*eps, /* eps? */
+                    Re[i][iedof, 1]: Re[i][iedof, 1] - D[iedof, jedof] * qd[sysout@elastic_dof_idx[i][jedof]]*eps /* eps? */
                 )
             ),
 
@@ -1232,7 +1247,7 @@ computeForceBalance(sysdef):= block([R, MG, PhiG_local, aG_local, omegad_local, 
             R[i]: R[i] + sysdef@ebody[i]@refmod@mass * sysdef@gravity,
 
             grav_local: transpose(submatrix(4, sysdef@T0G[i], 4)) . sysdef@gravity,
-            MG[i]: MG[i] + simplify_(submatrix(4, sysdef@T0G[i], 4) . crossmat(evalModalTaylor(sysdef@ebody[i]@md, sysdef@elastic_dof_idx[i])) . grav_local),
+            MG[i]: MG[i] + simplify_(submatrix(4, sysdef@T0G[i], 4) . crossmat(evalModalTaylor(sysdef@ebody[i]@md, sysdef@elastic_dof_idx[i], eps)) . grav_local),
             for iedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
                 Re[i][iedof, 1]: Re[i][iedof, 1] + simplify_(row(Ct, iedof) . grav_local)
             )
@@ -1247,6 +1262,9 @@ computeForceBalance(sysdef):= block([R, MG, PhiG_local, aG_local, omegad_local, 
 
 
 generalizedBalance(sysdef, bodyforces):= block([f, ibody, inode, iedof, idof, iframe, force],
+    if sysdef@SMALL_ELAST=0 then
+        eps: 1,
+
     f: zeromatrix(sysdef@nbrdof, 1),
     
     for ibody: 1 thru sysdef@nbrbody do (
@@ -1258,10 +1276,11 @@ generalizedBalance(sysdef, bodyforces):= block([f, ibody, inode, iedof, idof, if
         ibody: sysdef@node_forces[inode][1],
         iframe: sysdef@node_forces[inode][2],
         node_force: sysdef@node_forces[inode][3],
+        c_force: matrix(constraintForces(sysdef, bodyforces, [node_force])),
 
         for iedof: 1 thru length(sysdef@elastic_dof_idx[ibody]) do (
             idof: sysout@elastic_dof_idx[ibody][iedof],
-            bodyforces@Re[ibody]: bodyforces@Re[ibody] + transpose(matrix(constraintForces(sysdef, bodyforces, [node_force])) . sysdef@ebody[ibody]@frame[iframe]@phi@M1[idof]) * q[idof]
+            bodyforces@Re[ibody]: bodyforces@Re[ibody] + transpose(c_force . sysdef@ebody[ibody]@frame[iframe]@phi@M1[idof]) * q[idof]*eps /* eps? */
         )
     ),
         
@@ -1274,19 +1293,19 @@ generalizedBalance(sysdef, bodyforces):= block([f, ibody, inode, iedof, idof, if
     flatten(args(f))
 );
 
-constraintForces(sysdef, bodyforces, z_id):= block([g, inverse_idx, i],
+constraintForces(sysdef, bodyforces, z_id):= block([g_, inverse_idx, i],
     z_id: sublist(sysdef@z_list, lambda([x], (subvarp(x) and member(op(x), z_id)) or member(x, z_id))),
     inverse_idx: sublist_indices(sysdef@z_list, lambda([x], not(member(x, z_id)))),
 
-    g: zeromatrix(length(z_id), 1),
+    g_: zeromatrix(length(z_id), 1),
     
     for i: 1 thru sysdef@nbrbody do (
-        g: g + simplify_(transpose(apply(submatrix, append([sysdef@vGpartial_z[i]], inverse_idx))) . bodyforces@R[i]),
-        g: g + simplify_(transpose(apply(submatrix, append([sysdef@omegapartial_z[i]], inverse_idx))) . bodyforces@MG[i])
+        g_: g_ + transpose(apply(submatrix, append([sysdef@vGpartial_z[i]], inverse_idx))) . bodyforces@R[i],
+        g_: g_ + transpose(apply(submatrix, append([sysdef@omegapartial_z[i]], inverse_idx))) . bodyforces@MG[i]
     ),
     
     /* TODO add elastic body inner forces */
-    flatten(args(g))
+    flatten(args(simplify(g_)))
 );
 
 appliedForcesZero(sys):= (
