@@ -1,4 +1,8 @@
-function makeMex(model_name, target_path)
+function makeMex(model_name, target_path, mex_cpp, mex_name)
+
+if ~exist('mex_cpp', 'var')
+    mex_cpp= 'CADyn_mex.cpp';
+end
 
 cagem_path= getenv('cagem_path');
 if isempty(cagem_path)
@@ -13,7 +17,10 @@ cleanupObj = onCleanup(@()cd(start_dir));
 
 cd(target_path);
 
-mex_name= [model_name '_mex'];
+if ~exist('mex_name', 'var')
+    mex_name= [model_name '_mex'];
+end
+
 
 v= ver;
 is_matlab= ~strcmp(v(1).Name, 'Octave');
@@ -26,7 +33,7 @@ else
 end
 
 
-mex_file= fullfile(cagem_base, 'gen', 'CADyn_mex.cpp');
+mex_file= fullfile(cagem_base, 'gen', mex_cpp);
 
 defines= {['MBSystem=' model_name]};
 %  if exist('sfun', 'var') && sfun
@@ -64,9 +71,9 @@ end
 
 if ~is_matlab
     old_cxxflags= getenv('CXXFLAGS');
-    [status, cxxflags]= system('mkoctfile --print  CXXFLAGS');
+    [~, cxxflags]= system('mkoctfile --print  CXXFLAGS');
     cxxflags= [cxxflags ' -std=c++11 -Wall -fdiagnostics-show-option '];
-    cxxflags= strrep(cxxflags, char(10), ' ');
+    cxxflags= strrep(cxxflags, newline, ' ');
     setenv('CXXFLAGS', cxxflags);
 end
 
@@ -77,7 +84,8 @@ if ~is_matlab
 end
 
 compiled= false;
-if exist(mex_name_ext, 'file')
+code_file= [model_name 'System2.hpp'];
+if exist(mex_name_ext, 'file') && exist(code_file, 'file')
     dd_src= dir(code_file);
     dd_dst= dir(mex_name_ext);
     if dd_src.datenum<dd_dst.datenum
@@ -88,4 +96,10 @@ if ~compiled
     error('Mex was not properly compiled');
 end
 
-movefile(mex_name_ext, start_dir);
+try
+    movefile(mex_name_ext, start_dir);
+catch e
+    if ~strcmp(e.identifier, 'MATLAB:MOVEFILE:SourceAndDestinationSame')
+        rethrow(e);
+    end
+end
