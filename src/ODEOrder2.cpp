@@ -10,17 +10,20 @@
 #include <algorithm>
 #include <sstream>
 
-ODEOrder2::ODEOrder2(int nbrdof_, int nbrin_, const string &aname, const string &adesc):
+ODEOrder2::ODEOrder2(int nbrdof_, int nbrin_, int nbrout_, const string &aname, const string &adesc):
         name(aname),
         description(adesc),
         nbrdof(nbrdof_),
         nbrin(nbrin_),
+        nbrout(nbrout_),
         state_name(nbrdof_),
         in_name(nbrin_),
         M(nbrdof_, nbrdof_),
         C(nbrdof_, nbrdof_),
         K(nbrdof_, nbrdof_),
-        B(nbrdof_, nbrin_),    
+        B(nbrdof_, nbrin_),
+        CD(nbrout_, 2*nbrdof_+nbrin_),
+        F(nbrout_, nbrdof_),
         Jacobian(nbrdof_, nbrdof_),
         LU(),
         S(2*nbrdof_, 2*nbrdof_ + nbrin_),
@@ -30,6 +33,7 @@ ODEOrder2::ODEOrder2(int nbrdof_, int nbrin_, const string &aname, const string 
         f(nbrdof_),
         doflocked(nbrdof_, false),
         u(nbrin_),
+        y(nbrout_),
         t(0.0)
     {
         q.setZero();
@@ -119,6 +123,55 @@ void ODEOrder2::calcB() {
         
         u[jddl]= u_;
     }
+}
+
+void ODEOrder2::calcCDF() {
+    calcOut();
+    VecX y_base= y;
+    
+    for(int jddl= 0; jddl < nbrdof; jddl++) {
+        double q_= q[jddl];
+        
+        q[jddl]+= jac_fd_tol;
+        
+        calcOut();
+        CD.col(jddl)= (y - y_base)/jac_fd_tol;
+        
+        q[jddl]= q_;
+    }
+    for(int jddl= 0; jddl < nbrdof; jddl++) {
+        double qd_= qd[jddl];
+        
+        qd[jddl]+= jac_fd_tol;
+        
+        calcOut();
+        CD.col(jddl+nbrdof)= (y - y_base)/jac_fd_tol;
+        
+        qd[jddl]= qd_;
+    }
+    for(int jddl= 0; jddl < nbrin; jddl++) {
+        double u_= u[jddl];
+        
+        u[jddl]+= jac_fd_tol;
+        
+        calcOut();
+        CD.col(jddl+2*nbrdof)= (y - y_base)/jac_fd_tol;
+        
+        u[jddl]= u_;
+    }
+    
+    
+    for(int jddl= 0; jddl < nbrdof; jddl++) {
+        double qdd_= qdd[jddl];
+        
+        qdd[jddl]+= jac_fd_tol;
+        
+        calcOut();
+        F.col(jddl)= (y - y_base)/jac_fd_tol;
+        
+        qdd[jddl]= qdd_;
+    }
+    y= y_base;
 }
 
 bool ODEOrder2::staticEquilibrium() {
@@ -283,6 +336,7 @@ bool ODEOrder2::newmarkIntervalWithSens(double ts, double h) {
         if(first_run) {
             calcJacobian(1.0, Gamma*h, Beta*h*h);
             calcB();
+            calcCDF();
             PG_Pddxn_ddxn1.block(0, 0, nbrdof, nbrdof)= M;
             PG_Pxn_dxn_u.block(0, nbrdof, nbrdof, nbrdof)= C;
             PG_Pxn_dxn_u.block(0, 0, nbrdof, nbrdof)= K;
@@ -354,6 +408,10 @@ bool ODEOrder2::newmarkIntervalWithSens(double ts, double h) {
 
     S.block(0, 2*nbrdof, nbrdof, nbrin)= ts*ts*((0.5-Beta)*Pddxn_Pu + Beta*Pddxn1_Pu);
     S.block(nbrdof, 2*nbrdof, nbrdof, nbrin)= ts*((1.0-Gamma)*Pddxn_Pu + Gamma*Pddxn1_Pu);
+    
+    CD.block(0, 0, nbrout, nbrdof)+= F*Pddxn1_Pxn; // TODO: really ddxn_1_ ?
+    CD.block(0, nbrdof, nbrout, nbrdof)+= F*Pddxn1_Pdxn;
+    CD.block(0, 2*nbrdof, nbrout, nbrin)+= F*Pddxn1_Pu;
     
     return true;
 }

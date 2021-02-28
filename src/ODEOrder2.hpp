@@ -15,7 +15,7 @@ class AbstractIntegratorVisitor;
 
 class ODEOrder2 {
 public:
-    ODEOrder2(int nbrdof_, int nbrin_= 0, const string &aname= "anonymous_mbs", const string &adesc= "No description");
+    ODEOrder2(int nbrdof_, int nbrin_= 0, int nbrout_= 0, const string &aname= "anonymous_mbs", const string &adesc= "No description");
     virtual ~ODEOrder2() {}
 
     void writeStateVariablesHeader(std::ostream &OutFile);
@@ -24,6 +24,8 @@ public:
     virtual VecX computeResiduals()= 0;
     virtual void calcJacobian(double alphaM, double alphaC, double alphaK);
     virtual void calcB();
+    virtual void calcCDF();
+    virtual void calcOut()= 0;
     bool staticEquilibrium();
     bool staticEquilibriumWithLin();
     int newmarkOneStep(double h, bool hmodified= true);
@@ -35,7 +37,7 @@ public:
     string name;
     string description;
 
-    const int nbrdof, nbrin;
+    const int nbrdof, nbrin, nbrout;
     std::vector<string> state_name;
     std::vector<string> in_name;
     
@@ -43,6 +45,8 @@ public:
     MatX C;
     MatX K;
     MatX B;
+    MatX CD;
+    MatX F;
     MatX Jacobian;
     Eigen::FullPivLU<MatX> LU;
     MatX S;
@@ -52,6 +56,7 @@ public:
     
     std::vector<bool> doflocked;
     VecX u;
+    VecX y;
     
     double t;
     double jac_fd_tol= 1e-2;
