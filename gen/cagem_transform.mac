@@ -1,0 +1,42 @@
+unitX: transpose(matrix([1, 0, 0]));
+unitY: transpose(matrix([0, 1, 0]));
+unitZ: transpose(matrix([0, 0, 1]));
+
+/* Procedure giving the homogeneous transformation matrix of the rotation about X-axis by an angle thetax. */
+Trotx(thetax):= block([Toi],
+     Toi: matrix([1, 0, 0, 0],[0, cos(thetax), -sin(thetax), 0],[0, sin(thetax), cos(thetax), 0],[0,0,0,1])
+);
+
+
+/* Procedure giving the homogeneous transformation matrix of the rotation about Y-axis by an angle thetay. */
+Troty(thetay):= block([Toi],
+     Toi: matrix([cos(thetay), 0, sin(thetay), 0],[0, 1, 0, 0],[-sin(thetay), 0, cos(thetay), 0],[0,0,0,1])
+);
+
+/* Procedure giving the homogeneous transformation matrix of the rotation about Z-axis by an angle thetaz. */
+Trotz(thetaz):= block([Toi],
+     Toi: matrix([cos(thetaz), -sin(thetaz), 0, 0],[sin(thetaz), cos(thetaz), 0, 0],[0, 0, 1, 0],[0,0,0,1])
+);
+
+
+/* Procedure giving the homogeneous transformation matrix of the rotation by an angle theta
+   about an arbitrary axis whose direction cosines are equal to nx, ny and nz. */
+Trotn(nx,ny,nz,theta):= block([Toi],
+     Toi: matrix([nx*nx*(1-cos(theta))+cos(theta), nx*ny*(1-cos(theta))-nz*sin(theta), nx*nz*(1-cos(theta))-ny*sin(theta), 0],[nx*ny*(1-cos(theta))+nz*sin(theta), ny*ny*(1-cos(theta))+cos(theta), ny*nz*(1-cos(theta))-nx*sin(theta), 0],[nx*nz*(1-cos(theta))-ny*sin(theta), nx*nz*(1-cos(theta))+nx*sin(theta), nz*nz*(1-cos(theta))+cos(theta), 0],[0,0,0,1])
+);
+
+/* Procedure giving the homogeneous transformation matrix of the displacement about its coordinates x, y and z. */
+Tdisp(x,y,z):= block([Toi],
+     Toi: matrix([1,0,0,x],[0,1,0,y],[0,0,1,z],[0,0,0,1])
+);
+
+Telast(nbody, nframe):= block([Toi, xyz, ori, z_elast],
+    z_elast: [concat(z_elast_, nbody, '_, nframe)[1], concat(z_elast_, nbody, '_, nframe)[2], concat(z_elast_, nbody, '_, nframe)[3]],
+    xyz: ebody[nbody]@frame[nframe]@origin@M0 + apply("+", makelist(eps*ebody[nbody]@frame[nframe]@origin@M1[i]*elastic_dof[nbody][i], i, 1, length(elastic_dof[nbody]))),
+    ori: ident(3) + apply("+", makelist(eps*eps_rot*ebody[nbody]@frame[nframe]@ap@M1[i]*elastic_dof[nbody][i], i, 1, length(elastic_dof[nbody]))),
+
+    z_list: append(z_list, z_elast),
+    node_forces: endcons([nbody, nframe, concat(z_elast_, nbody, '_, nframe)], node_forces), 
+    Toi: Tdisp(z_elast[1], z_elast[2], z_elast[3]) . Tdisp(xyz[1, 1], xyz[2, 1], xyz[3, 1]) . addcol(addrow(ori, [0, 0, 0]), [0, 0, 0, 1])
+);
+

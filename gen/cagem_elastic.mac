@@ -1,0 +1,234 @@
+makeEmptyTaylor(order, nrow, ncol, nelem, nq, nqn, struct):= block([t],
+    t: new(mtaylor),
+    t@order: order,
+    t@nrow: nrow,
+    t@ncol: ncol,
+    t@nelem: nelem,
+    t@nq: nq,
+    t@nqn: nqn,
+    t@struct: struct,
+    
+    if nelem>0 then
+        t@M0: makelist(zeromatrix(nrow, ncol), i, 1, nelem)
+    else
+        t@M0: zeromatrix(nrow, ncol),
+    
+    if order>0 then
+        t@M1: makelist(copy(t@M0), i, 1, nq),
+            
+    if order>1 then
+        error("Elements of class taylor with order > 1 currently not supported"),
+            
+    t
+);
+
+emptyElasticFrame(nedof, name):= block([f],
+    f: new(frame),
+
+    f@name: name,
+
+    f@origin: makeEmptyTaylor(1, 3, 1, 0, nedof, 0, 3),
+    f@ap: makeEmptyTaylor(1, 3, 3, 0, nedof, 0, 3),
+
+    f@phi: makeEmptyTaylor(1, 3, nedof, 0, nedof, 0, 3),
+    f@psi: makeEmptyTaylor(0, 3, nedof, 0, nedof, 0, 3),
+    f@sigma: makeEmptyTaylor(1, 6, 1, 0, nedof, 0, 3),
+
+    f
+);
+    
+emptyElasticMode(nedof, [frames]):= block([b, rm],
+    b: new(modal),
+    
+    rm: new(refmod),
+    
+    rm@mass: 0,
+    rm@nelastq: nedof,
+    rm@ielastq: makelist(sconcat("Noname DOF", i), i, 1, nedof),
+    
+    b@refmod: rm,
+    
+    if length(frames)>0 then
+        b@frame: makelist(emptyElasticFrame(nedof, sconcat("frame", i)), i, 1, frames[1])
+    else
+        b@frame: [],
+    
+    b@md: makeEmptyTaylor(1, 3, 1, 0, nedof, 0, 3),
+    b@I: makeEmptyTaylor(1, 3, 3, 0, nedof, 0, 2), /* 2nd order element currently not supported */
+    b@Ct: makeEmptyTaylor(1, nedof, 3, 0, nedof, 0, 3),
+    b@Cr: makeEmptyTaylor(1, nedof, 3, 0, nedof, 0, 3),
+    b@Me: makeEmptyTaylor(0, nedof, nedof, 0, nedof, 0, 2),
+    b@Gr: makeEmptyTaylor(1, 3, 3, nedof, nedof, 0, 3),
+    b@Ge: makeEmptyTaylor(0, nedof, 3, nedof, nedof, 0, 3),
+    b@Oe: makeEmptyTaylor(1, nedof, 6, 0, nedof, 0, 3),
+    b@K: makeEmptyTaylor(1, nedof, nedof, 0, nedof, 0, 2),
+    b@D: makeEmptyTaylor(0, nedof, nedof, 0, nedof, 0, 2),
+
+    b
+);
+
+genericEmptyTaylor(order, nrow, ncol, nelem, nq, nqn, struct, name):= block([t],
+    t: new(mtaylor),
+    t@order: order,
+    t@nrow: nrow,
+    t@ncol: ncol,
+    t@nelem: nelem,
+    t@nq: nq,
+    t@nqn: nqn,
+    t@struct: struct,
+    
+    name: eval_string(concat("'", name)),
+    
+    /* TODO: consider symmetric matrices */
+    if nelem>0 then
+        t@M0: makelist(genmatrix(lambda([i, j], concat(name, "0_", k, "__", i, "_", j)), nrow, ncol), k, 1, nelem)
+    else
+        t@M0: genmatrix(lambda([i, j], concat(name, "0_", i, "_", j)), nrow, ncol),
+    
+    if order>0 then
+        if nelem>0 then
+            t@M1: makelist(makelist(genmatrix(lambda([i, j], concat(name, "1_", l, "_", k, "__", i, "_", j)), nrow, ncol), k, 1, nelem), l, 1, nq)
+        else
+            t@M1: makelist(genmatrix(lambda([i, j], concat(name, "1_", l, "__", i, "_", j)), nrow, ncol), l, 1, nq),
+        
+            
+    if order>1 then
+        error("Elements of class taylor with order > 1 currently not supported"),
+            
+    t
+);
+
+genericElasticMode(nedof, name, [frames]):= block([b, rm],
+    b: new(modal),
+    
+    rm: new(refmod),
+    
+    rm@mass: eval_string(concat("'", name, "_mass")),
+    rm@nelastq: nedof,
+    rm@ielastq: makelist(sconcat(name, " DOF", i), i, 1, nedof),
+    
+    b@refmod: rm,
+    
+    /* TODO add generic frames */
+    if length(frames)>0 then
+        b@frame: makelist(emptyElasticFrame(nedof, sconcat("frame", i)), i, 1, frames[1])
+    else
+        b@frame: [],
+            
+    b@md: genericEmptyTaylor(1, 3, 1, 0, nedof, 0, 3, concat(name, "_md")),
+    b@I: genericEmptyTaylor(1, 3, 3, 0, nedof, 0, 2, concat(name, "_I")), /* 2nd order element currently not supported */
+    b@Ct: genericEmptyTaylor(1, nedof, 3, 0, nedof, 0, 3, concat(name, "_Ct")),
+    b@Cr: genericEmptyTaylor(1, nedof, 3, 0, nedof, 0, 3, concat(name, "_Cr")),
+    b@Me: genericEmptyTaylor(0, nedof, nedof, 0, nedof, 0, 2, concat(name, "_Me")),
+    b@Gr: genericEmptyTaylor(1, 3, 3, nedof, nedof, 0, 3, concat(name, "_Gr")),
+    b@Ge: genericEmptyTaylor(0, nedof, 3, nedof, nedof, 0, 3, concat(name, "_Ge")),
+    b@Oe: genericEmptyTaylor(1, nedof, 6, 0, nedof, 0, 3, concat(name, "_Oe")),
+    b@K: genericEmptyTaylor(1, nedof, nedof, 0, nedof, 0, 2, concat(name, "_K")),
+    b@D: genericEmptyTaylor(0, nedof, nedof, 0, nedof, 0, 2, concat(name, "_D")),
+
+    b
+);
+
+calcElasticModeLumpedPrecomputed(PHI, rr, mm):= block([b, i, iPHI, jPHI, md, Ct, Cr, Me, Mee, Gr, Oe, Ge, Gee], 
+    b: emptyElasticMode(length(PHI), length(PHI[1])),
+    
+    m: 0,
+    for i:1 thru length(PHI[1]) do (
+        m: m + mm[i]
+    ),
+    b@refmod@mass: m,
+    
+    I: zeromatrix(3, 3),
+    for i:1 thru length(PHI[1]) do (
+        I: I - crossmat(rr[i]).crossmat(rr[i])*mm[i]
+    ),
+    b@I@M0: I,
+    
+    md: zeromatrix(3, 1),
+    for i:1 thru length(PHI[1]) do (
+        md: md + transpose(matrix(rr[i]*mm[i]))
+    ),
+    b@md@M0: md,
+    
+    b@Ct@M0: zeromatrix(0, 3),
+    for iPHI:1 thru length(PHI) do (
+        Ct: [0, 0, 0],
+        for i:1 thru length(PHI[1]) do (
+            Ct: Ct + PHI[iPHI][i]*mm[i]
+        ),
+        b@Ct@M0: addrow(b@Ct@M0, Ct)
+    ),
+
+    b@Cr@M0: zeromatrix(0, 3),
+    for iPHI:1 thru length(PHI) do (
+        Cr: [0, 0, 0],
+        for i:1 thru length(PHI[1]) do (
+            Cr: Cr + cross(rr[i], PHI[iPHI][i])*mm[i]
+        ),
+        b@Cr@M0: addrow(b@Cr@M0, Cr)
+    ),
+
+    for iPHI:1 thru length(PHI) do (
+        for jPHI:1 thru length(PHI) do (
+            Me: 0,
+            for i: 1 thru length(PHI[1]) do
+                b@Me@M0[iPHI, jPHI]: b@Me@M0[iPHI, jPHI] + apply("+", PHI[iPHI][i]*PHI[jPHI][i])*mm[i]
+        )
+    ),
+    
+    for iPHI:1 thru length(PHI) do (
+        Gr: zeromatrix(3, 3),
+        for i:1 thru length(PHI[1]) do (
+            Gr: Gr + 2*transpose(crossmat(rr[i])).crossmat(PHI[iPHI][i])*mm[i]
+        ),
+        b@Gr@M0[iPHI]: Gr
+    ),
+        
+    for iPHI:1 thru length(PHI) do (
+        Gee: zeromatrix(0, 3),
+        for jPHI:1 thru length(PHI) do (
+            Ge: [0, 0, 0],
+            for i: 1 thru length(PHI[1]) do
+                Ge: Ge + 2*cross(PHI[iPHI][i], PHI[jPHI][i])*mm[i],
+            Gee: addrow(Gee, Ge)
+        ),
+        b@Ge@M0[iPHI]: Gee
+    ),
+    
+    for iPHI:1 thru length(PHI) do (
+        for i:1 thru length(PHI[1]) do (
+            b@Oe@M0[iPHI, 1]: b@Oe@M0[iPHI, 1]-(rr[i][3]*PHI[iPHI][i][3] + rr[i][2]*PHI[iPHI][i][2]) * mm[i], /* wx^2 */
+            b@Oe@M0[iPHI, 2]: b@Oe@M0[iPHI, 2]-(rr[i][3]*PHI[iPHI][i][3] + rr[i][1]*PHI[iPHI][i][1]) * mm[i], /* wy^2 */
+            b@Oe@M0[iPHI, 3]: b@Oe@M0[iPHI, 3]-(rr[i][2]*PHI[iPHI][i][2] + rr[i][1]*PHI[iPHI][i][1]) * mm[i], /* wz^2 */
+            b@Oe@M0[iPHI, 4]: b@Oe@M0[iPHI, 4]+(rr[i][1]*PHI[iPHI][i][2] + rr[i][2]*PHI[iPHI][i][1]) * mm[i], /* wx*wy */
+            b@Oe@M0[iPHI, 5]: b@Oe@M0[iPHI, 5]+(rr[i][2]*PHI[iPHI][i][3] + rr[i][3]*PHI[iPHI][i][2]) * mm[i], /* wy*wz */
+            b@Oe@M0[iPHI, 6]: b@Oe@M0[iPHI, 6]+(rr[i][1]*PHI[iPHI][i][3] + rr[i][3]*PHI[iPHI][i][1]) * mm[i]  /* wx*wz */
+        )
+    ),
+
+    for i:1 thru length(PHI[1]) do (
+        b@frame[i]@origin@M0: transpose(matrix(rr[i])),
+        b@frame[i]@ap@M0: ident(3),
+
+        for iPHI:1 thru length(PHI) do (
+            b@frame[i]@origin@M1[iPHI]: transpose(matrix(PHI[iPHI][i]))
+        )
+    ),
+    
+    b
+);
+
+evalModalTaylor(t, edof_idx, eps):= block([r, i, j],
+    r: copy(t@M0),
+    
+    if t@order>0 then
+        for i: 1 thru t@nq do
+            if t@nelem>0 then (
+                for j: 1 thru t@nelem do
+                    r[j]: r[j] + t@M1[i][j]*q[edof_idx[i]]*eps /* eps? */
+            ) else
+                r: r + t@M1[i]*q[edof_idx[i]]*eps, /* eps? */
+            
+    r
+);
+

@@ -1,0 +1,7 @@
+calcAccelerations(f, M):= block([QDD, f_],
+    QDD: transpose(matrix(makelist(qdd[i], i, 1, length(f)))),
+    f_: ratsimp(M.QDD-transpose(matrix(f))),
+    
+    flatten(args(invert(M).f_))
+);
+

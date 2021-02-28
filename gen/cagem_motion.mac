@@ -1,0 +1,67 @@
+composeMotion(sysdef):= block([erel, vrel, vrel_z, arel, wrel, wrel_z, wdrel, vGpartial, omegapartial, vGpartial_z, omegapartial_z, elasticpartial],
+    sysout: copy(sysdef),
+    for i: 1 thru sysout@nbrbody do (
+        vGpartial: zeromatrix(3, 0),
+        omegapartial: zeromatrix(3, 0),
+        vGpartial_z: zeromatrix(3, 0),
+        omegapartial_z: zeromatrix(3, 0),
+        elasticpartial: zeromatrix(0, sysout@nbrdof),
+        for j: 1 thru sysout@nbrdof do (
+            vGpartial: addcol(vGpartial, sysout@vGpartial[i][j]),
+            omegapartial: addcol(omegapartial, sysout@omegapartial[i][j])
+        ),
+        for j: 1 thru sysout@nbrcon do (
+            vGpartial_z: addcol(vGpartial_z, sysout@vGpartial_z[i][j]),
+            omegapartial_z: addcol(omegapartial_z, sysout@omegapartial_z[i][j])
+        ),
+        sysout@vGpartial[i]: vGpartial,
+        sysout@omegapartial[i]: omegapartial,
+        sysout@vGpartial_z[i]: vGpartial_z,
+        sysout@omegapartial_z[i]: omegapartial_z,
+        
+        if numberp(sysout@BodyRef[i]) then (
+            erel: simplify_(submatrix(4, sysout@T0G[sysout@BodyRef[i]], 4) . submatrix(4, sysout@T0G[i], 1, 2, 3)),
+            vrel: simplify_(submatrix(4, sysout@T0G[sysout@BodyRef[i]], 4) . sysout@vG[i]),
+            arel: simplify_(submatrix(4, sysout@T0G[sysout@BodyRef[i]], 4) . sysout@aG[i]),
+            wrel: simplify_(submatrix(4, sysout@T0G[sysout@BodyRef[i]], 4) . sysout@omega[i]),
+            wdrel: simplify_(submatrix(4, sysout@T0G[sysout@BodyRef[i]], 4) . sysout@omegad[i]),
+
+            sysout@T0G[i]: simplify(sysout@T0G[sysout@BodyRef[i]] . sysout@T0G[i]),
+            sysout@vG[i]: simplify(sysout@vG[sysout@BodyRef[i]] + crossmat(sysout@omega[sysout@BodyRef[i]]) . erel + vrel),
+            sysout@omega[i]: simplify(sysout@omega[sysout@BodyRef[i]] + wrel),
+            sysout@aG[i]: simplify(sysout@aG[sysout@BodyRef[i]] + crossmat(sysout@omegad[sysout@BodyRef[i]]) . erel + crossmat(sysout@omega[sysout@BodyRef[i]]) . (crossmat(sysout@omega[sysout@BodyRef[i]]) . erel) + 2.0*crossmat(sysout@omega[sysout@BodyRef[i]]) . vrel + arel),
+            sysout@omegad[i]: simplify(sysout@omegad[sysout@BodyRef[i]] + crossmat(sysout@omega[sysout@BodyRef[i]]) . wrel + wdrel),
+    
+            vGpartial: zeromatrix(3, 0),
+            omegapartial: zeromatrix(3, 0),
+            vGpartial_z: zeromatrix(3, 0),
+            omegapartial_z: zeromatrix(3, 0),
+            for j: 1 thru sysout@nbrdof do (
+                vrel: simplify_(submatrix(4, sysout@T0G[sysout@BodyRef[i]], 4) . col(sysout@vGpartial[i], j)),
+                wrel: simplify_(submatrix(4, sysout@T0G[sysout@BodyRef[i]], 4) . col(sysout@omegapartial[i], j)),
+                vGpartial: simplify_(addcol(vGpartial, col(sysout@vGpartial[sysout@BodyRef[i]], j) + crossmat(col(sysout@omegapartial[sysout@BodyRef[i]], j)) . erel + vrel)),
+                omegapartial: simplify_(addcol(omegapartial, col(sysout@omegapartial[sysout@BodyRef[i]], j) + wrel))
+            ),
+            sysout@vGpartial[i]: simplify(subst([eps=1], vGpartial)),
+            sysout@omegapartial[i]: simplify(subst([eps=1], omegapartial)),
+            
+            for j: 1 thru sysout@nbrcon do (
+                vrel_z: simplify_(submatrix(4, sysout@T0G[sysout@BodyRef[i]], 4) . col(sysout@vGpartial_z[i], j)),
+                wrel_z: simplify_(submatrix(4, sysout@T0G[sysout@BodyRef[i]], 4) . col(sysout@omegapartial_z[i], j)),
+                vGpartial_z: simplify_(addcol(vGpartial_z, col(sysout@vGpartial_z[sysout@BodyRef[i]], j) + crossmat(col(sysout@omegapartial_z[sysout@BodyRef[i]], j)) . erel + vrel_z)),
+                omegapartial_z: simplify_(addcol(omegapartial_z, col(sysout@omegapartial_z[sysout@BodyRef[i]], j) + wrel_z))
+            ),
+            sysout@vGpartial_z[i]: simplify(subst([eps=1], vGpartial_z)),
+            sysout@omegapartial_z[i]: simplify(subst([eps=1], omegapartial_z))
+        ),
+        
+        for iedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
+            elasticpartial: addrow(elasticpartial, zeromatrix(1, sysout@nbrdof)),
+            elasticpartial[iedof, sysout@elastic_dof_idx[i][iedof]]: 1
+        ),
+        sysout@elasticpartial[i]: simplify(subst([eps=1], elasticpartial))
+    ),
+    
+    sysout
+);
+

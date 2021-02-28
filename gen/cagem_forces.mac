@@ -1,0 +1,18 @@
+applyForceInLocal(r, F, T0G):= block([Fin0],
+    Fin0: submatrix(4, T0G, 4) . F,
+    applyForceIn0(r, Fin0, T0G)
+);
+
+
+applyForceIn0(r, Fin0, T0G):= block([],
+    [Fin0, crossmat(submatrix(4, T0G, 4) . r) . Fin0]
+);
+
+appliedForcesZero(sys):= (
+    for i:1 thru sys@nbrbody do (
+        appliedF[i]: zeromatrix(3, 1),
+        appliedM[i]: zeromatrix(3, 1),
+        appliedFe[i]: zeromatrix(length(sys@elastic_dof_idx[i]), 1)
+    )
+);
+

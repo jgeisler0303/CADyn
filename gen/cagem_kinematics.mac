@@ -1,0 +1,394 @@
+prepareKinematics(file):= block([
+    time0, timeKI1, timeKI2, timeSP1, timeSP2, timeCPP, timePLT,
+    ssKI1, ssKI2, ssKI, ssSP1, ssSP2, ssSP, ssCPP, ssPLT,
+    timeTEXFR, ssTEXFR, timeTEXEN, ssTEXEN, timeTotal, ss, mm, seconds,
+    filePLT, fileTEXFR, fileTEXEN, fileCPP,
+    nbrbodymax, nbrdofmax, nbrdepmax, 
+    i, j, j_, k, k_, f, temp, phiG, pi, pdi, pddi, p, pd, pdd, q, nbr_relative, elastic_dof_idx, 
+    SIMPLIFY, SMALL_ELAST,INPUTS, STATES, WITH_LINEAR, WITH_ACCELERATIONS, EXTERNAL, DEXT_VARS, EXT_VARS, EXT_PARAM, F_EXT, 
+    title, mass, IG, gravity, T0G, TrefG, elastic_dof, ebody, BodyRef, T0Gd, R0G, R0Gd, MatRot, omega, omega_z, omega_, omegad, vG, vG_z, vG_, aG, nbrdof, nbrz, nbrbody, nbrdep, vGpartial, omegapartial, z_list: [], node_forces: [], vGpartial_z, omegapartial_z,
+    qi, qdi, Ixx, Iyy, Izz, Ixy, Ixz, Iyz], 
+    local(temp, phiG, mass, IG, gravity, T0G, TrefG, elastic_dof, ebody, BodyRef, T0Gd, R0G, R0Gd, MatRot, omega, omega_z, omega_, omegad, vG, vG_z, vG_, aG, vGpartial, omegapartial, vGpartial_z, omegapartial_, qi, qdi, Ixx, Iyy, Izz, Ixy, Ixz, Iyz, pi, pdi, pddi, p, pd, pdd, q, qi, qdi, FinalTime, StepSave, StepMax, EXTERNAL, DEXT_VARS, EXT_VARS, EXT_PARAM, F_EXT),
+
+
+    /* Program initialization. */
+    print("===================================================================="),
+    print("CAGeM v1.2.4"),
+    print("(\"Computed-Aided Generation of Motion\")"),
+    print("===================================================================="),
+
+
+    keepfloat: true,
+    ratprint: false,
+    load(file),
+
+    /* Counter initialization. */
+    time0: elapsed_run_time(),
+
+    /* Option flags initialization. */
+    if SIMPLIFY='SIMPLIFY then SIMPLIFY: 1,
+    if SMALL_ELAST='SMALL_ELAST then SMALL_ELAST: 0,
+    if WITH_LINEAR='WITH_LINEAR then WITH_LINEAR: 1,
+    if WITH_ACCELERATIONS='WITH_ACCELERATIONS then WITH_ACCELERATIONS: 0,
+    if WITH_LINEAR#1 then WITH_ACCELERATIONS: 0,
+    if INPUTS='INPUTS then INPUTS: [],
+    if STATES='STATES then STATES: [],
+    if EXTERNAL='EXTERNAL then EXTERNAL: [],
+    if EXT_PARAM='EXT_PARAM then EXT_PARAM: [],
+    if F_EXT='F_EXT then F_EXT: [],
+    if FinalTime='FinalTime then FinalTime: 10.0,
+    if StepSave='StepSave then StepSave: 0.01,
+    if StepMax='StepMax then StepMax: 0.01,
+    
+    if not(member(TrefG, arrays)) then TrefG[0]: [],
+    if not(member(elastic_dof, arrays)) then elastic_dof[0]: [],
+    nbrbody: lmax(append(flatten(rest(arrayinfo(T0G), 2)), flatten(rest(arrayinfo(TrefG), 2)))),
+    nbrdof: max(lmax(flatten(map(args, sublist(listofvars([listarray(T0G), listarray(TrefG), listarray(elastic_dof)]), lambda([x], subvarp(x) and op(x)='q))))), 0),
+    nbrz: max(lmax(flatten(map(args, sublist(listofvars([listarray(T0G), listarray(TrefG)]), lambda([x], subvarp(x) and op(x)='z))))), 0),
+    for i: 1 thru nbrz do z_list: endcons(z[i], z_list),
+    if member('pi, arrays) then nbrdep: lmax(flatten(rest(arrayinfo(pi), 2))) else nbrdep: 0,
+    if gravity='gravity then gravity: [0.0, 0.0, -9.81],
+    nbrin: length(INPUTS),
+            
+    IG: makelist(zeromatrix(3, 3), i, 1, nbrbody),
+    for i:1 thru nbrbody do (
+        if member('Ixx, arrays) and member(i, flatten(rest(arrayinfo(Ixx), 2))) then IG[i][1, 1]: Ixx[i],
+        if member('Iyy, arrays) and member(i, flatten(rest(arrayinfo(Iyy), 2))) then IG[i][2, 2]: Iyy[i],
+        if member('Izz, arrays) and member(i, flatten(rest(arrayinfo(Izz), 2))) then IG[i][3, 3]: Izz[i],
+        if member('Ixy, arrays) and member(i, flatten(rest(arrayinfo(Ixy), 2))) then (IG[i][1, 2]: Ixy[i], IG[i][2, 1]: Ixy[i]),
+        if member('Ixz, arrays) and member(i, flatten(rest(arrayinfo(Ixz), 2))) then (IG[i][1, 3]: Ixz[i], IG[i][3, 1]: Ixz[i]),
+        if member('Iyz, arrays) and member(i, flatten(rest(arrayinfo(Iyz), 2))) then (IG[i][2, 3]: Iyz[i], IG[i][3, 2]: Iyz[i])
+    ),
+    for i:1 thru nbrdof do (
+        if not(member('qi, arrays)) or not(member(i, flatten(rest(arrayinfo(qi), 2)))) then qi[i]: 0.0,
+        if not(member('qdi, arrays)) or not(member(i, flatten(rest(arrayinfo(qdi), 2)))) then qdi[i]: 0.0
+    ),
+    
+    EXT_VARS: [],
+    DEXT_VARS: [],
+    kill(gradefs),
+    for i: 1 thru length(EXTERNAL) do (
+        f_name: op(EXTERNAL[i]),
+        f_args: args(EXTERNAL[i]),
+           
+        EXT_VARS: endcons(f_name, EXT_VARS),
+                                       
+        for j: 1 thru length(f_args) do (
+            if subvarp(f_args[j]) then
+                f_arg: concat(op(f_args[j]), args(f_args[j])[1])
+            else
+                f_arg: f_args[j],
+            df_darg: concat(d, f_name, "_d", f_arg),
+            apply(gradef, [f_name, f_args[j], df_darg]),
+            DEXT_VARS: endcons(df_darg, DEXT_VARS)
+        )
+    ),
+    
+    nbr_relative: 0,
+    zero_matrix:  zeromatrix(4, 4),
+    zero_z_list: makelist(z_list[i]=0, i, 1, length(z_list)),
+    for i:1 thru nbrbody do (
+        if not(member(i, flatten(rest(arrayinfo(T0G), 2)))) or (T0G[i] = zero_matrix and BodyRef[i] # -1) then (
+            index_relative[i]: 1,
+            T0G[i]: TrefG[i],
+            nbr_relative: nbr_relative+1
+        ) else (
+            index_relative[i]: 0
+        ),
+        if member(i, flatten(rest(arrayinfo(elastic_dof), 2))) then (
+            elastic_dof[i]: sublist(elastic_dof[i], lambda([x], subvarp(x) and op(x)='q)),
+            elastic_dof_idx[i]: flatten(map(args, elastic_dof[i]))
+        ) else
+            elastic_dof_idx[i]: []
+            
+        /*T0G[i]: float(T0G[i])*/
+    ),
+
+    printf(true, "Generating for system with ~d bodies (~d relative), ~d degrees of freedom, ~d dependent variables.~%", nbrbody, nbr_relative, nbrdof, nbrdep),
+    
+    print("Declaration of dependant variables"),
+    /* Declaration of dependant variables. 
+    for k: 1 thru nbrdep do
+        depends(pi[k], t),*/
+    depends(p, t),
+    
+
+    print("Creation of time dependence."),
+    depends(q, t),
+
+    for i: 1 thru length(z_list) do 
+        depends(op(z_list[i]), t),
+    
+    print("Calculed kinematics (part one)."),
+    /* Calculed kinematics (part one). */
+    for i: 1 thru nbrbody do (
+        T0Gd[i]: diff(T0G[i], t),
+        vG[i]: submatrix(4, T0Gd[i], 1, 2, 3),
+        vG_z[i]: simplify(vG[i]),
+        vG[i]: simplify(subst(zero_z_list, vG[i])),
+        
+        R0G[i]: submatrix(4, T0G[i], 4),
+        R0Gd[i]: submatrix(4, T0Gd[i], 4),
+        MatRot[i]: R0Gd[i].transpose(R0G[i]),
+        omega[i]: matrix([MatRot[i][3,2]], [MatRot[i][1,3]], [MatRot[i][2,1]]),
+        omega_z[i]: simplify(omega[i]),
+        omega[i]: simplify(subst(zero_z_list, omega[i])),
+        
+        T0G[i]: simplify(subst(zero_z_list, T0G[i])),
+        T0Gd[i]: simplify(subst(zero_z_list, T0Gd[i]))        
+    ),
+
+    for k:1 thru nbrdep do
+        pdi[k]: diff(pi[k],t),
+    
+    timeKI1: elapsed_run_time(),
+    ssKI1: trunc(timeKI1-time0),
+
+    print("Simplification of kinematics parameters (part one)"),
+    /* Simplification of kinematics parameters (part one). */
+    if SIMPLIFY=1 then (
+        for i:1 thru nbrbody do (
+            T0G[i]: simplify(T0G[i]),
+            T0Gd[i]: simplify(T0Gd[i]),
+            vG[i]: simplify(vG[i]),
+            omega[i]: simplify(omega[i]),
+            vG_z[i]: simplify(vG_z[i]),
+            omega_z[i]: simplify(omega_z[i])
+        ),
+        
+        for k: 1 thru nbrdep do
+            pi[k]: simplify(pi[k]),
+            pdi[k]: simplify(pdi[k])
+    ),
+    
+    timeSP1: elapsed_run_time(),
+    ssSP1: trunc(timeSP1-timeKI1),
+
+    print("Complete calculed kinematics (part two)"),
+    /* Complete calculed kinematics (part two). */
+    for i:1 thru nbrbody do (
+        aG[i]: diff(vG[i], t),
+        omegad[i]: diff(omega[i], t)
+    ),
+    
+    for k:1 thru nbrdep do
+        pddi[k]: diff(pdi[k], t),
+
+    timeKI2: elapsed_run_time(),
+    ssKI2: trunc(timeKI2-timeSP1),
+
+    print("Simplification of kinematics parameters (part two)"),
+    /* Simplification of kinematics parameters (part two). */
+    if SIMPLIFY=1 then (
+        for i:1 thru nbrbody do (
+            aG[i]: simplify(aG[i]),
+            omegad[i]: simplify(omegad[i])
+        ),
+        for k:1 thru nbrdep do
+            pddi[k]: simplify(pddi[k])
+    ),
+    
+    timeSP2: elapsed_run_time(),
+    ssSP2: trunc(timeSP2-timeKI2),
+
+    
+    print("Form modification of configuration parameters"),
+    /* Form modification of configuration parameters. */
+    /* TODO may be handled more elegantly by gradef */
+    for i:1 thru nbrbody do (
+        for j:1 thru nbrdof do (
+            j_: j,
+            vG[i]: subst(qdd[j_], diff(q[j],t,2), vG[i]),
+            vG[i]: subst(qd[j_], diff(q[j],t), vG[i]),
+            vG[i]: subst(q[j_], q[j], vG[i]),
+            omega[i]: subst(qdd[j_], diff(q[j],t,2), omega[i]),
+            omega[i]: subst(qd[j_], diff(q[j],t), omega[i]),
+            omega[i]: subst(q[j_], q[j], omega[i]),
+            vG_z[i]: subst(qdd[j_], diff(q[j],t,2), vG_z[i]),
+            vG_z[i]: subst(qd[j_], diff(q[j],t), vG_z[i]),
+            vG_z[i]: subst(q[j_], q[j], vG_z[i]),
+            omega_z[i]: subst(qdd[j_], diff(q[j],t,2), omega_z[i]),
+            omega_z[i]: subst(qd[j_], diff(q[j],t), omega_z[i]),
+            omega_z[i]: subst(q[j_], q[j], omega_z[i]),
+            aG[i]: subst(qdd[j_], diff(q[j],t,2), aG[i]),
+            aG[i]: subst(qd[j_], diff(q[j],t), aG[i]),
+            aG[i]: subst(q[j_], q[j], aG[i]),
+            omegad[i]: subst(qdd[j_], diff(q[j],t,2), omegad[i]),
+            omegad[i]: subst(qd[j_], diff(q[j],t), omegad[i]),
+            omegad[i]: subst(q[j_], q[j], omegad[i]),
+            T0G[i]: subst(qdd[j_], diff(q[j],t,2), T0G[i]),
+            T0G[i]: subst(qd[j_], diff(q[j],t), T0G[i]),
+            T0G[i]: subst(q[j_], q[j], T0G[i]),
+            T0Gd[i]: subst(qdd[j_], diff(q[j],t,2), T0Gd[i]),
+            T0Gd[i]: subst(qd[j_], diff(q[j],t), T0Gd[i]),
+            T0Gd[i]: subst(q[j_], q[j], T0Gd[i])
+        ),
+        for j:1 thru nbrdep do (
+            j_: j,
+            vG[i]: subst(pdd[j_], diff(p[j],t,2), vG[i]),
+            vG[i]: subst(pd[j_], diff(p[j],t), vG[i]),
+            vG[i]: subst(p[j_], p[j], vG[i]),
+            omega[i]: subst(pdd[j_], diff(p[j],t,2), omega[i]),
+            omega[i]: subst(pd[j_], diff(p[j],t), omega[i]),
+            omega[i]: subst(p[j_], p[j], omega[i]),
+            vG_z[i]: subst(pdd[j_], diff(p[j],t,2), vG_z[i]),
+            vG_z[i]: subst(pd[j_], diff(p[j],t), vG_z[i]),
+            vG_z[i]: subst(p[j_], p[j], vG_z[i]),
+            omega_z[i]: subst(pdd[j_], diff(p[j],t,2), omega_z[i]),
+            omega_z[i]: subst(pd[j_], diff(p[j],t), omega_z[i]),
+            omega_z[i]: subst(p[j_], p[j], omega_z[i]),
+            aG[i]: subst(pdd[j_], diff(p[j],t,2), aG[i]),
+            aG[i]: subst(pd[j_], diff(p[j],t), aG[i]),
+            aG[i]: subst(p[j_], p[j], aG[i]),
+            omegad[i]: subst(pdd[j_], diff(p[j],t,2), omegad[i]),
+            omegad[i]: subst(pd[j_], diff(p[j],t), omegad[i]),
+            omegad[i]: subst(p[j_], p[j], omegad[i]),
+            T0G[i]: subst(pdd[j_], diff(p[j],t,2), T0G[i]),
+            T0G[i]: subst(pd[j_], diff(p[j],t), T0G[i]),
+            T0G[i]: subst(p[j_], p[j], T0G[i]),
+            T0Gd[i]: subst(pdd[j_], diff(p[j],t,2), T0Gd[i]),
+            T0Gd[i]: subst(pd[j_], diff(p[j],t), T0Gd[i]),
+            T0Gd[i]: subst(p[j_], p[j], T0Gd[i])
+        ),
+        for j:1 thru length(z_list) do (
+            j_: j,
+            vG_z[i]: subst(zd[j_], diff(z_list[j],t), vG_z[i]),
+            omega_z[i]: subst(zd[j_], diff(z_list[j],t), omega_z[i])
+        )
+    ),
+    for k:1 thru nbrdep do (
+        for j:1 thru nbrdof do (
+            j_: j,
+            pi[k]: subst(q[j_], q[j], pi[k]),
+            pdi[k]: subst(qd[j_], diff(q[j],t), pdi[k]),
+            pdi[k]: subst(q[j_], q[j], pdi[k]),
+            pddi[k]: subst(qdd[j_], diff(q[j],t, 2), pddi[k]),
+            pddi[k]: subst(qd[j_], diff(q[j],t), pddi[k]),
+            pddi[k]: subst(q[j_], q[j], pddi[k])
+        ),
+        for j:1 thru nbrdep do (
+            j_: j,
+            pi[k]: subst(p[j_], p[j], pi[k]),
+            pdi[k]: subst(pd[j_], diff(p[j],t), pdi[k]),
+            pdi[k]: subst(p[j_], p[j], pdi[k]),
+            pddi[k]: subst(pdd[j_], diff(p[j],t, 2), pddi[k]),
+            pddi[k]: subst(pd[j_], diff(p[j],t), pddi[k]),
+            pddi[k]: subst(p[j_], p[j], pddi[k])
+        )
+    ),
+
+    print("Complete calculed kinematics (part three)"),
+    /* Complete calculed kinematics (part three). */
+    for i:1 thru nbrbody do (
+        for j:1 thru nbrdof do (
+            j_: j,
+            vG_: vG[i],
+            omega_: omega[i],
+            for k: nbrdep step -1 thru 1 do (
+                k_: k,
+                vG_: subst(pdi[k], pd[k_], vG_),
+                vG_: subst(pi[k], p[k_], vG_),
+                omega_: subst(pdi[k], pd[k_], omega_),
+                omega_: subst(pi[k], p[k_], omega_)
+            ),
+            
+            vGpartial[i, j]: diff(vG_, qd[j_]),
+            omegapartial[i, j]: diff(omega_, qd[j_])
+        ),
+        for j:1 thru length(z_list) do (
+            j_: j,
+            for k: nbrdep step -1 thru 1 do (
+                k_: k,
+                vG_z[i]: subst(pdi[k], pd[k_], vG_z[i]),
+                vG_z[i]: subst(pi[k], p[k_], vG_z[i]),
+                omega_z[i]: subst(pdi[k], pd[k_], omega_z[i]),
+                omega_z[i]: subst(pi[k], p[k_], omega_z[i])
+            ),
+            vGpartial_z[i, j]: diff(vG_z[i], zd[j_]),
+            omegapartial_z[i, j]: diff(omega_z[i], zd[j_])
+        )
+    ),
+    
+    timeKI3: elapsed_run_time(),
+    SSKI3: trunc(timeKI3-timeSP2),
+    ssKI: ssKI1+ssKI2+SSKI3,
+    printf(true, "... Kinematics computation finished ~,3h s.~%", ssKI),
+                
+    print("Simplification of kinematics parameters (part three)"),
+    /* Simplification of kinematics parameters (part three). */
+    if SIMPLIFY = 1 then (
+        for i:1 thru nbrbody do (
+            for j:1 thru nbrdof do (
+                vGpartial[i,j]: simplify(vGpartial[i,j]),
+                omegapartial[i,j]: simplify(omegapartial[i,j])
+            ),
+            for j:1 thru length(z_list) do (
+                vGpartial_z[i,j]: simplify(vGpartial_z[i,j]),
+                omegapartial_z[i,j]: simplify(omegapartial_z[i,j])
+            )
+        )
+    ),
+    
+    timeSP3: elapsed_run_time(),
+    ssSP3: trunc(timeSP3-timeKI3),
+    ssSP: ssSP1+ssSP2+ssSP3, 
+    printf(true, "... Kinematics simplification finished in ~,3h s.~%", ssSP),
+    
+    /* Total CPU-time. */
+    timeTotal: elapsed_run_time(),
+    ss: timeTotal-time0,
+    mm: floor(ss/60),
+    totseconds:trunc(ss-mm*60),
+    printf(true, "All the operations are finished. Total CPU-time in Maxima: ~d:~6,3,,,,'0h min.~%", mm, totseconds),
+    
+    sysdef: new(sysdef_type),
+
+    sysdef@file: file,
+    sysdef@name: title,
+    sysdef@nbrdof: nbrdof,
+    sysdef@nbrcon: length(z_list),
+    sysdef@nbrbody: nbrbody,
+    sysdef@nbrin: nbrin,
+    sysdef@nbrdep: nbrdep,
+    sysdef@gravity: makelist(gravity[i], i, 1, 3),
+    sysdef@mass: makelist(mass[i], i, 1, nbrbody),
+    sysdef@IG: makelist(IG[i], i, 1, nbrbody),
+    sysdef@T0G: makelist(simplify(T0G[i]), i, 1, nbrbody),
+    sysdef@vG: makelist(simplify(vG[i]), i, 1, nbrbody),
+    sysdef@omega: makelist(simplify(omega[i]), i, 1, nbrbody),
+    sysdef@aG: makelist(simplify(aG[i]), i, 1, nbrbody),
+    sysdef@omegad: makelist(simplify(omegad[i]), i, 1, nbrbody),
+    sysdef@vGpartial: makelist(makelist(simplify(vGpartial[i, j]), j, 1, nbrdof), i, 1, nbrbody),
+    sysdef@vGpartial_z: makelist(makelist(simplify(vGpartial_z[i, j]), j, 1, length(z_list)), i, 1, nbrbody),
+    sysdef@elasticpartial: makelist([], i, 1, nbrbody),
+    sysdef@omegapartial: makelist(makelist(simplify(omegapartial[i, j]), j, 1, nbrdof), i, 1, nbrbody),
+    sysdef@omegapartial_z: makelist(makelist(simplify(omegapartial_z[i, j]), j, 1, length(z_list)), i, 1, nbrbody),
+    sysdef@z_list: makelist(z_list[i], i, 1, length(z_list)),
+    sysdef@node_forces: makelist(node_forces[i], i, 1, length(node_forces)),
+    sysdef@BodyRef: makelist(BodyRef[i], i, 1, nbrbody),
+    sysdef@ebody: makelist(ebody[i], i, 1, nbrbody),
+    sysdef@elastic_dof_idx: makelist(elastic_dof_idx[i], i, 1, nbrbody),
+    sysdef@pi: makelist(pi[i], i, 1, nbrdep),
+    sysdef@pdi: makelist(pdi[i], i, 1, nbrdep),
+    sysdef@pddi: makelist(pddi[i], i, 1, nbrdep),
+    sysdef@qi: makelist(qi[i], i, 1, nbrdof),
+    sysdef@qdi: makelist(qdi[i], i, 1, nbrdof),
+    sysdef@FinalTime: FinalTime,
+    sysdef@StepSave: StepSave,
+    sysdef@StepMax: StepMax,
+    sysdef@appliedF: makelist(appliedF[i], i, 1, nbrbody),
+    sysdef@appliedM: makelist(appliedM[i], i, 1, nbrbody),
+    sysdef@appliedFe: makelist(appliedFe[i], i, 1, nbrbody),
+    sysdef@SIMPLIFY: SIMPLIFY,
+    sysdef@SMALL_ELAST: SMALL_ELAST,
+    sysdef@WITH_LINEAR: WITH_LINEAR,
+    sysdef@WITH_ACCELERATIONS: WITH_ACCELERATIONS,
+    sysdef@u: INPUTS,
+    sysdef@external: EXT_VARS,
+    sysdef@d_external: DEXT_VARS,
+    sysdef@ext_param: EXT_PARAM,
+    sysdef@f_ext: F_EXT,
+        
+    sysdef
+);
+

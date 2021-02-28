@@ -1,0 +1,13 @@
+defstruct(sysdef_type (file, name, nbrdof, nbrcon, nbrbody, nbrin, nbrdep, gravity, mass, IG, T0G, vG, omega, aG, omegad, vGpartial, omegapartial, vGpartial_z, omegapartial_z, elasticpartial, BodyRef, ebody, elastic_dof_idx, z_list, node_forces, pi, pdi, pddi, qi, qdi, FinalTime, StepSave, StepMax, appliedF, appliedM, appliedFe, SIMPLIFY, SMALL_ELAST, WITH_LINEAR, WITH_ACCELERATIONS, u, external, d_external, ext_param, f_ext));
+defstruct(cagem_out (sys_rel, sys_abs, forces, f, constraints, params, f_lin, accelerations, outputs, const_eqns));
+
+defstruct(bodyforces_type (R, MG, Re));
+
+defstruct(lin_model (M, E, A, B, C, D, F, Ap, Apd, Apdd, dp_dq, dp_dp, dpd_dq, dpd_dqd, dpd_dp, dpd_dpd, dpdd_dq, dpdd_dqd, dpdd_dqdd, dpdd_dp, dpdd_dpd, dpdd_dpdd));
+
+/* TODO: add ksigma */
+defstruct(modal (refmod, frame, I, md, Ct, Cr, Me, Gr, Oe, Ge, K, D));
+defstruct(mtaylor (order, nrow, ncol, nelem, nq, nqn, struct, M0, M1, Mn));
+defstruct(refmod (mass, nelastq, ielastq));
+defstruct(frame (name, origin, ap, phi, psi, sigma));
+

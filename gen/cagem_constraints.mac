@@ -1,0 +1,15 @@
+constraintForces(sysdef, bodyforces, z_id):= block([g_, inverse_idx, i],
+    z_id: sublist(sysdef@z_list, lambda([x], (subvarp(x) and member(op(x), z_id)) or member(x, z_id))),
+    inverse_idx: sublist_indices(sysdef@z_list, lambda([x], not(member(x, z_id)))),
+
+    g_: zeromatrix(length(z_id), 1),
+    
+    for i: 1 thru sysdef@nbrbody do (
+        g_: g_ + transpose(apply(submatrix, append([sysdef@vGpartial_z[i]], inverse_idx))) . bodyforces@R[i],
+        g_: g_ + transpose(apply(submatrix, append([sysdef@omegapartial_z[i]], inverse_idx))) . bodyforces@MG[i]
+    ),
+    
+    /* TODO add elastic body inner forces */
+    flatten(args(simplify(g_)))
+);
+

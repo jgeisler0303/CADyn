@@ -1,0 +1,16 @@
+decomp(expr):= block([], if atom(expr) or subvarp(expr) then [] else append([op(expr)],  map(decomp, args(expr))));
+exp_size(expr):= length(flatten(decomp(expr)));
+/* simplify(x):= radcan(trigreduce(trigsimp(x)));  ratsimp, trigrat ?? */
+/* simplify(x):= block([s0, s1, s2], s0: eval_string(string(ev(x, float))), s1: ratsimp(trigreduce(trigsimp(s0))), s2: ratsimp(trigsimp(s0)), if exp_size(s1)>exp_size(s2) then s2 else s1); */
+/* simplify(x):= block([s0, s1, s2, s3], s0: x, s1: ratsimp(trigreduce(trigsimp(s0))), s2: ratsimp(trigsimp(s0)), if exp_size(s1)>exp_size(s2) then s3: s2 else s3:s1, ev(s3, float)); */
+simplify(x):= block([s0, s1, s2, s3, s4], 
+    s0: trigsimp(fullratsubst([eps_rot^2=0], x)),
+    s1: ratsimp(trigreduce(s0)),
+    s2: ratsimp(s0),
+    if exp_size(s1)>exp_size(s2) then s3: s2 else s3:s1,
+/*    s4: ratsimp(ev(s3, float)),*/
+    s4: fullratsimp(s3),
+    if exp_size(s3)>exp_size(s4) then s4 else s3
+);
+
+simplify_(x):= x;

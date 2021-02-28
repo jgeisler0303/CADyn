@@ -1,0 +1,32 @@
+generalizedBalance(sysdef, bodyforces):= block([f, ibody, inode, iedof, idof, iframe, force],
+    if sysdef@SMALL_ELAST=0 then
+        eps: 1,
+
+    f: zeromatrix(sysdef@nbrdof, 1),
+    
+    for ibody: 1 thru sysdef@nbrbody do (
+        f: f - simplify_(transpose(sysdef@vGpartial[ibody]) . bodyforces@R[ibody]),
+        f: f - simplify_(transpose(sysdef@omegapartial[ibody]) . bodyforces@MG[ibody])
+    ),
+
+    for inode: 1 thru length(sysdef@node_forces) do (
+        ibody: sysdef@node_forces[inode][1],
+        iframe: sysdef@node_forces[inode][2],
+        node_force: sysdef@node_forces[inode][3],
+        c_force: matrix(constraintForces(sysdef, bodyforces, [node_force])),
+
+        for iedof: 1 thru length(sysdef@elastic_dof_idx[ibody]) do (
+            idof: sysout@elastic_dof_idx[ibody][iedof],
+            bodyforces@Re[ibody]: bodyforces@Re[ibody] + transpose(c_force . sysdef@ebody[ibody]@frame[iframe]@phi@M1[idof]) * q[idof]*eps /* eps? */
+        )
+    ),
+        
+    for ibody: 1 thru sysdef@nbrbody do (
+        if length(sysdef@elastic_dof_idx[ibody]) > 0 then (
+            f: f - simplify_(transpose(sysdef@elasticpartial[ibody]) . bodyforces@Re[ibody])
+        )
+    ),
+    
+    flatten(args(f))
+);
+

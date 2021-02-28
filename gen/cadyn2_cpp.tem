@@ -178,13 +178,17 @@ class <<gentran(literal(eval(filename), "System"))>>: public ODEOrder2 {
 public:
     static const int nStates= <<gentran(literal(eval(nbrdof)))>>;
     static const int nInputs= <<gentran(literal(eval(nbrin)))>>;
+    static const int nOutputs= <<gentran(literal(eval(length(y))))>>;
     static const int nbrdep= <<gentran(literal(eval(nbrdep)))>>;
     
     <<gentran(literal(eval(filename), "System"))>>(); 
         
+    void precalcConsts();
     virtual VecX computeResiduals();
     virtual void calcJacobian(double alphaM, double alphaC, double alphaK);
     virtual void calcB();
+    virtual void calcCDF();
+    virtual void calcOut();
 <<block([], 
     if length(external) > 0 then (
         gentran(literal("    void calculateExternal()\;", cr)),
@@ -204,12 +208,17 @@ public:
     for i:1 thru length(d_external) do
         gentran(literal("    double ", eval(d_external[i]), "\;", cr))
 )>>
+
+<<block([i], 
+    for i:1 thru length(pre_calc_const) do
+        gentran(literal("    double ", eval(first(pre_calc_const[i])), "\;", cr))
+)>>
 };
 
 const int <<gentran(literal(eval(filename)))>>System::nbrdep;
 
 <<gentran(literal(eval(filename), "System"))>>::<<gentran(literal(eval(filename), "System"))>>() : 
-    ODEOrder2(nStates, nInputs, "<<gentran(literal(eval(filename)))>>", "<<gentran(literal(eval(title)))>>"),
+    ODEOrder2(nStates, nInputs, nOutputs, "<<gentran(literal(eval(filename)))>>", "<<gentran(literal(eval(title)))>>"),
     param(),
     p(nbrdep),
     pd(nbrdep),
@@ -228,6 +237,32 @@ const int <<gentran(literal(eval(filename)))>>System::nbrdep;
 )>>
 }
 
+void <<gentran(literal(eval(filename)))>>System::precalcConsts() {
+<<block([i], 
+    for i:1 thru length(pre_calc_const) do
+        do_assign(first(pre_calc_const[i]), second(pre_calc_const[i])),
+        
+    if const_matrix_once=1 then (    
+        gentran(literal(cr)),
+        genmat(E, nbrdof, nbrdof, nbrdof, nbrdof, "M", 2),
+        gentran(literal(cr)),
+        genmat(-A, nbrdof, nbrdof, nbrdof, nbrdof, "C", 2),
+        gentran(literal(cr)),
+        genmat(-A, nbrdof, nbrdof, nbrdof, 0, "K", 2),
+        
+        gentran(literal(cr)),
+        genmat(-B, nbrdof, nbrin, nbrdof, 0, "B", 2),
+            
+        gentran(literal(cr)),
+        genmat(C, length(y), 2*nbrdof, 0, 0, "CD", 2),
+        gentran(literal(cr)),
+        genmat(D, length(y), nbrin, 0, 0, "CD.block(0, 2*nbrdof, nbrout, nbrin)", 2),
+        gentran(literal(cr)),
+        genmat(F, length(y), nbrdof, 0, 0, "F", 2)
+    )
+)>>    
+}
+
 VecX <<gentran(literal(eval(filename)))>>System::computeResiduals() {
     VecX f_(nbrdof);
     
@@ -236,7 +271,7 @@ VecX <<gentran(literal(eval(filename)))>>System::computeResiduals() {
         gentran(literal("    calculateExternal()\;", cr, cr))
     )
 )>>
-    // TODO write non-constant values only once
+
 <<block([i, i_, opt], 
     ?ccurrind\*: 8,
 
@@ -278,10 +313,9 @@ VecX <<gentran(literal(eval(filename)))>>System::computeResiduals() {
 void <<gentran(literal(eval(filename)))>>System::calcJacobian(double alphaM, double alphaC, double alphaK) {
 <<block([], 
     if length(external) > 0 then (
-        gentran(literal("    calculateExternalWithDeriv()\;", cr, cr))
+        gentran(literal("    calculateExternalWithDeriv()\;", cr))
     )
 )>>
-    // TODO write non-constant values only once
 <<block([i, i_, opt], 
     ?ccurrind\*: 8,
 
@@ -307,18 +341,26 @@ void <<gentran(literal(eval(filename)))>>System::calcJacobian(double alphaM, dou
 <<block([i, i_, j, j_, opt], 
     ?ccurrind\*: 8,
     
-    opt: genopt([f, E, -A, flatten(args(Ap)), flatten(args(Apd)), flatten(args(Apdd)), flatten(args(dp_dq)), flatten(args(dp_dp)), flatten(args(dpd_dq)), flatten(args(dpd_dp)), flatten(args(dpdd_dq)), flatten(args(dpdd_dqd)), flatten(args(dpdd_dqdd)), flatten(args(dpdd_dp)), flatten(args(dpdd_dpd))]),
+    if const_matrix_once=1 then (    
+        E_no_const: matrixmap(lambda([e], if constantp(e) then 0 else e), E),        
+        A_no_const: matrixmap(lambda([e], if constantp(e) then 0 else e), A)
+    ) else (
+        E_no_const: E,
+        A_no_const: A
+    ),
+        
+    opt: genopt([f, E_no_const, -A_no_const, flatten(args(Ap)), flatten(args(Apd)), flatten(args(Apdd)), flatten(args(dp_dq)), flatten(args(dp_dp)), flatten(args(dpd_dq)), flatten(args(dpd_dp)), flatten(args(dpdd_dq)), flatten(args(dpdd_dqd)), flatten(args(dpdd_dqdd)), flatten(args(dpdd_dp)), flatten(args(dpdd_dpd))]),
     gentran(literal(cr)),
 
-    genmat(opt[2], nbrdof, nbrdof, nbrdof, nbrdof, "M"),
+    genmat(opt[2], nbrdof, nbrdof, nbrdof, nbrdof, "M", const_matrix_once),
     gentran(literal(cr)),
-    genmat(opt[3], nbrdof, nbrdof, nbrdof, nbrdof, "C"),
+    genmat(opt[3], nbrdof, nbrdof, nbrdof, nbrdof, "C", const_matrix_once),
     gentran(literal(cr)),
-    genmat(opt[3], nbrdof, nbrdof, nbrdof, 0, "K"),
+    genmat(opt[3], nbrdof, nbrdof, nbrdof, 0, "K", const_matrix_once),
     gentran(literal(cr)),
 
     if nbrdep > 0 then (
-        gentran(literal("        // TODO make these fix size matrices", cr)),
+        gentran(literal("        // TODO make class members and write non-constant values only once", cr)),
 
         gentran(literal("        MatX Ap(nbrdof, nbrdep)\;", cr)),
         genmat(opt[4], nbrdof, nbrdep, 0, 0, "Ap"),
@@ -409,10 +451,60 @@ void <<gentran(literal(eval(filename)))>>System::calcB() {
 <<block([opt], 
     ?ccurrind\*: 4,
     
-    opt: genopt([-B]),
+    if const_matrix_once=1 then (    
+        B_no_const: matrixmap(lambda([e], if constantp(e) then 0 else e), B)
+    ) else (
+        B_no_const: B
+    ),
+    
+    opt: genopt([-B_no_const]),
     gentran(literal(cr)),
     
-    genmat(opt[1], nbrdof, nbrin, nbrdof, 0, "B")    
+    genmat(opt[1], nbrdof, nbrin, nbrdof, 0, "B", const_matrix_once)
+)>>
+}
+
+void <<gentran(literal(eval(filename)))>>System::calcCDF() {
+<<block([opt], 
+    ?ccurrind\*: 4,
+
+    if const_matrix_once=1 then (    
+        C_no_const: matrixmap(lambda([e], if constantp(e) then 0 else e), C),
+        D_no_const: matrixmap(lambda([e], if constantp(e) then 0 else e), D),
+        F_no_const: matrixmap(lambda([e], if constantp(e) then 0 else e), F)
+    ) else (
+        C_no_const: C,
+        D_no_const: D,
+        F_no_const: F
+    ),        
+    
+    opt: genopt([y, C_no_const, D_no_const, F_no_const]),
+    gentran(literal(cr)),
+    
+    for i:1 thru length(y) do (
+        i_: i-1,
+        do_assign(concat("y[", i_, "]"), opt[1][i])
+    ),
+    
+    gentran(literal(cr)),
+    genmat(opt[2], length(y), 2*nbrdof, 0, 0, "CD", const_matrix_once),
+    gentran(literal(cr)),
+    genmat(opt[3], length(y), nbrin, 0, 0, "CD.block(0, 2*nbrdof, nbrout, nbrin)", const_matrix_once),
+    gentran(literal(cr)),
+    genmat(opt[4], length(y), nbrdof, 0, 0, "F", const_matrix_once)
+)>>
+}
+
+void <<gentran(literal(eval(filename)))>>System::calcOut() {
+<<block([opt], 
+    ?ccurrind\*: 4,
+    
+    opt: genopt([y]),
+        
+    for i:1 thru length(y) do (
+        i_: i-1,
+        do_assign(concat("y[", i_, "]"), opt[1][i])
+    )
 )>>
 }
 
