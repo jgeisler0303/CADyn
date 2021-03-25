@@ -1,0 +1,192 @@
+<<gentran(literal("%% File generated form template cadyn_acados.m.tem on ", eval(timedate()), ". Do not edit!", cr))>>
+<<gentran(literal("%% Multibody system: ", eval(title), cr, cr))>>
+
+function model= <<gentran(literal(eval(filename)))>>_model()
+
+import casadi.*
+
+% system dimensions
+nx = 2*<<gentran(literal(eval(nbrdof)))>>;
+nu = <<gentran(literal(eval(nbrin)))>>;
+ny = <<gentran(literal(eval(length(y))))>>;
+
+% system parameters
+model.name= mfilename;
+
+stateName= {
+<<block([i], 
+    for i:1 thru nbrdof do
+        gentran(literal("    'q", eval(i), "'", cr))
+)>>};
+makeCasADiNamedVector('q', stateName, model, 1, 1);
+
+dstateName= {
+<<block([i], 
+    for i:1 thru nbrdof do
+        gentran(literal("    'qd", eval(i), "'", cr))
+)>>};
+makeCasADiNamedVector('qd', dstateName, model, 1, 1);
+
+ddstateName= {
+<<block([i], 
+    for i:1 thru nbrdof do
+        gentran(literal("    'qdd", eval(i), "'", cr))
+)>>};
+makeCasADiNamedVector('qdd', ddstateName, model, 1, 1);
+
+sym_x= [q; qd];
+
+dstateName_= strcat('dot', stateName);
+makeCasADiNamedVector('xdot1', dstateName_, model, 1, 1);
+sym_xdot= [xdot1; qdd];
+
+inputName= cell(nu, 1);
+<<block([i, i_, opt], 
+        ?ccurrind\*: 0,
+        for i:1 thru nbrin do (
+            do_assign(concat("inputName{", i, "}"), concat("'", u[i], "'"))
+        )
+)>>
+makeCasADiNamedVector('sym_u', inputName, model, 1, 1);
+u= sym_u;
+
+makeCasADiNamedVector('sym_z', {}, model, 1, 1);
+
+% Parameters
+paramName= struct();
+<<block([i, dims],
+    for i:1 thru length(params) do (
+        if subvarp(params[i]) then (
+            dims: args(params[i]),
+            if length(dims)=1 then dims: endcons(1, dims),
+            
+            gentran(literal("paramName.", eval(op(params[i])), "= ", eval(dims[1]), "*", eval(dims[2]), "\;", cr))
+        ) else
+            gentran(literal("paramName.", eval(params[i]), "= 1\;", cr))
+    )
+)>>
+<<block([i], 
+    for i:1 thru length(pre_calc_const) do
+        gentran(literal("paramName.", eval(first(pre_calc_const[i])), "= 1\;", cr))
+)>>
+makeCasADiNamedVector('sym_p', paramName, model, 1, 1);
+
+
+% external equations
+externalNames= {
+<<block([i], 
+    for i:1 thru length(external) do
+        gentran(literal("    '", eval(external[i]), "'", cr))
+)>>};
+makeCasADiNamedVector('externals', externalNames, model, 1, 1);
+        
+<<block([i], 
+    if length(external) > 0 then (
+        gentran(literal(eval(filename), "_external\;", cr))
+    )
+)>>
+    
+
+% implicit second order model
+<<block([i, i_, opt], 
+    ?ccurrind\*: 0,
+
+    opt: genopt([f], f_temp),
+    gentran(literal(cr)),
+
+    for i:1 thru nbrdof do (
+        do_assign(concat('f, i), opt[1][i])
+    ),
+    
+    gentran(literal("f= [")),
+    for i:1 thru nbrdof do (
+        gentran(literal("f", eval(i))),
+        if i<nbrdof then
+            gentran(literal(", "))
+    ),
+    gentran(literal("]'\;", cr))    
+)>>
+
+
+% Implicit Nonlinear State-Space Model
+f_impl_expr = [xdot1 - qd; f];
+        
+
+% Outputs
+<<block([opt], 
+    ?ccurrind\*: 0,
+    
+    opt: genopt([y], out_temp),
+        
+    for i:1 thru length(y) do (
+        do_assign(concat('sym_y, i), opt[1][i])
+    ),
+    
+    gentran(literal("sym_y= [")),
+    for i:1 thru length(y) do (
+        gentran(literal("sym_y", eval(i))),
+        if i<nbrdof then
+            gentran(literal(", "))
+    ),
+    gentran(literal("]'\;", cr))    
+)>>
+
+
+% populate structure
+model.nx = nx;
+model.nu = nu;
+model.sym_u = sym_u;
+model.sym_z = sym_z;
+model.sym_x = sym_x;
+model.sym_xdot = sym_xdot;
+model.sym_p = sym_p;
+model.y = sym_y;
+model.expr_f_impl = f_impl_expr;
+
+end
+
+
+function model= makeCasADiNamedVector(vec_name, names, model, unpack, uses_sx)
+if ~exist('unpack', 'var')
+    unpack= false;
+end
+
+if isstruct(names)
+    s= names;
+    names= fieldnames(s);
+    sizes= zeros(size(names));
+    for i= 1:length(names)
+        sizes(i)= s.(names{i});
+    end
+else
+    sizes= ones(size(names));
+end
+
+n= sum(sizes);
+model.([vec_name '_names'])= names;
+model.([vec_name '_sizes'])= sizes;
+model.([vec_name '_indices'])= [0; cumsum(sizes(1:end-1))];
+
+model.(['n' vec_name])= n;
+if unpack, assignin('caller', ['n' vec_name], n); end
+if exist('uses_sx', 'var') && uses_sx
+    model.(vec_name)= casadi.SX.sym(vec_name, n);
+else
+    model.(vec_name)= casadi.MX.sym(vec_name, n);
+end
+if unpack, assignin('caller', vec_name, model.(vec_name)); end
+
+for i= 1:length(names)
+    idx= sum(sizes(1:i-1))+1;
+    model.(['i' vec_name '_' names{i}])= idx;
+    if unpack, evalin('caller', sprintf('i%s_%s= %d;', vec_name, names{i}, i)); end
+    
+    model.([vec_name '_by_name']).(names{i})= model.(vec_name)((1:sizes(i))+idx-1);
+    if unpack, evalin('caller', sprintf('%s= %s(%d:%d);', names{i}, vec_name, idx, idx+sizes(i)-1)); end
+end
+
+end
+
+function p= pow(b, e)
+p= b^e;
+end

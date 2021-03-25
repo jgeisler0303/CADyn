@@ -1,0 +1,91 @@
+
+do_assign(n_work, e_work):= block([],
+    gentran(lrsetq(eval(n_work), scanmap('float, subst(subst_list, e_work))))
+);
+
+genopt(l, temp_name):= block([o, temps, replace_list, i],
+    o: optimize(l),
+
+    if op(o)#'block then
+        return(o),
+        
+    temps: inpart(o, 1),
+
+    pre_replace_list: makelist(temps[i]=concat(temp_name, i), i, 1, length(temps)),
+    replace_list: [],
+    
+    for i: 1 thru length(temps) do (
+        if not(listp(inpart(o, i+1, 2)) or matrixp(inpart(o, i+1, 2))) then (
+            do_assign(concat(temp_name, i), subst(pre_replace_list, inpart(o, i+1, 2))),
+            replace_list: endcons(pre_replace_list[i], replace_list)
+        ) else (
+            replace_list: endcons(inpart(o, i+1, 1)=inpart(o, i+1, 2), replace_list)
+        )
+    ),
+
+    subst(replace_list, subst(replace_list, inpart(o, length(temps)+2)))
+);
+
+
+cagem_acados(sysdef, [varargs]):= block([i, j, i_, j_, file, title, nbrdof, nbrbody, nbrin, nbrdep, external, params, f],
+    file: sysdef@sys_rel@file,
+    title: sysdef@sys_rel@name,
+    nbrdof: sysdef@sys_rel@nbrdof,
+    nbrbody: sysdef@sys_rel@nbrbody,
+    nbrdep: sysdef@sys_rel@nbrdep,
+    nbrin: sysdef@sys_rel@nbrin,
+    u: sysdef@sys_rel@u,
+    y: sysdef@outputs, nbrdof, nbrdep,
+    external: sysdef@sys_rel@external,
+    params: append(sysdef@params, sysdef@sys_rel@ext_param),
+
+    f: sysdef@f,
+    
+    pre_calc_const: sysdef@const_eqns,
+    
+    subst_list: [],
+    for i:1 thru nbrdof do
+        subst_list: endcons(q[i]=concat(q, i), subst_list),
+    for i:1 thru nbrdof do
+        subst_list: endcons(qd[i]=concat(qd, i), subst_list),
+    for i:1 thru nbrdof do
+        subst_list: endcons(qdd[i]=concat(qdd, i), subst_list),
+
+    filepath: pathname_directory(file),
+    if length(varargs)>0 then (
+        filepath: varargs[1],
+        if slength(filepath)>0 then
+            if notequal(substring (filepath, slength(filepath), slength(filepath)+1),"/") then
+                filepath: sconcat(filepath, "/")
+    ),
+    filename: pathname_name(file),
+    
+    load("gentran"),
+    gentranlang(c),
+    on('float),
+    off('gentranseg),
+    ?clinelen\*: 1000,            
+    gentranin(filename_merge(cagem_dir, "cadyn_acados.m.tem"), [openw(sconcat(filepath, filename, "_model.m"))]),
+                                      
+    ext_file: sconcat(filepath, filename, "_external.m"),
+    if file_search(ext_file)=false then (
+        ext_file_source: sconcat(pathname_directory(file), filename, "external.m"),
+        
+        if not(file_search(ext_file_source)=false) then (
+            load(operatingsystem),
+            copy_file(ext_file_source, ext_file)
+        )
+    ),
+
+    if length(pre_calc_const)>0 then (
+        subst_list: [],
+        for i:1 thru length(sysdef@params) do
+            subst_list: endcons(sysdef@params[i]=concat('param\., sysdef@params[i]), subst_list),
+    
+        gentranin(filename_merge(cagem_dir, "cadyn_acados_pre_calc.m.tem"), [openw(sconcat(filepath, filename, "_pre_calc.m"))])
+    ),
+    
+    gentranin(filename_merge(cagem_dir, "model_parameters.m.tem"), [openw(sconcat(filepath, "model_parameters.m"))])    
+);
+
+
