@@ -2,7 +2,7 @@ do_assign(n_work, e_work):= block([],
     gentran(lrsetq(eval(n_work), scanmap('float, subst(subst_list, e_work))))
 );
 
-cagem2c(sysdef, [target_dir]):= block([i, j, i_, j_, file, title, nbrdof, nbrbody, nbrin, nbrdep, gravity, mass, IG, T0G, vG, omega, aG, omegad, vGpartial, omegapartial, BodyRef, ebody, elastic_dof_idx, pi, pdi, pddi, qi, qdi, FinalTime, StepSave, StepMax],
+cagem_gen_cpp_recursive(sysdef, [target_dir]):= block([i, j, i_, j_, file, title, nbrdof, nbrbody, nbrin, nbrdep, gravity, mass, IG, T0G, vG, omega, aG, omegad, vGpartial, omegapartial, BodyRef, ebody, elastic_dof_idx, pi, pdi, pddi, qi, qdi, FinalTime, StepSave, StepMax],
     file: sysdef@file,
     title: sysdef@name,
     nbrdof: sysdef@nbrdof,

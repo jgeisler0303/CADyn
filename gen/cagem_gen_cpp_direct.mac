@@ -70,7 +70,7 @@ genopt(l):= block([o, temps, replace_list, i],
 );
 
 
-cagem2c2(sysdef, [varargs]):= block([i, j, i_, j_, file, title, nbrdof, nbrbody, nbrin, nbrdep, external, d_external, params, E, A, Ap, Apd, Apdd, f, pi, pdi, pddi, dp_dq, dp_dp, dpd_dq, dpd_dqd, dpd_dp, dpd_dpd, dpdd_dq, dpdd_dqd, dpdd_dqdd, dpdd_dp, dpdd_dpd, dpdd_dpdd, qi, qdi, FinalTime, StepSave, StepMax],
+cagem_gen_cpp_direct(sysdef, [varargs]):= block([i, j, i_, j_, file, title, nbrdof, nbrbody, nbrin, nbrdep, external, d_external, params, E, A, Ap, Apd, Apdd, f, pi, pdi, pddi, dp_dq, dp_dp, dpd_dq, dpd_dqd, dpd_dp, dpd_dpd, dpdd_dq, dpdd_dqd, dpdd_dqdd, dpdd_dp, dpdd_dpd, dpdd_dpdd, qi, qdi, FinalTime, StepSave, StepMax],
     file: sysdef@sys_rel@file,
     title: sysdef@sys_rel@name,
     nbrdof: sysdef@sys_rel@nbrdof,
