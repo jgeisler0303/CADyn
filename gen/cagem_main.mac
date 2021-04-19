@@ -1,7 +1,8 @@
 cagem(file, [varargs]):= block([output, i, appliedF, appliedM, appliedFe, T0G, accelerations],
     output: new(cagem_out),
 
-    output@sys_rel: prepareKinematics(file),
+    output@sys_rel: prepareInput(file),
+    output@sys_rel: prepareKinematics(output@sys_rel),
     output@sys_abs: composeMotion(output@sys_rel),
     print("Done with composeMotion"),
     output@forces: computeForceBalance(output@sys_abs),

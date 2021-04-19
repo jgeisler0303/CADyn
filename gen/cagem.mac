@@ -26,6 +26,7 @@ load(cagem_forces);
 load(cagem_simplify);
 
 load(cagem_main);
+load(cagem_input);
 load(cagem_kinematics);
 load(cagem_elastic);
 load(cagem_motion);

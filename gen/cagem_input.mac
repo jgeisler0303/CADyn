@@ -1,0 +1,138 @@
+prepareInput(file):= block([
+    time0, timeKI1, timeKI2, timeSP1, timeSP2, timeCPP, timePLT,
+    ssKI1, ssKI2, ssKI, ssSP1, ssSP2, ssSP, ssCPP, ssPLT,
+    timeTEXFR, ssTEXFR, timeTEXEN, ssTEXEN, timeTotal, ss, mm, seconds,
+    filePLT, fileTEXFR, fileTEXEN, fileCPP,
+    nbrbodymax, nbrdofmax, nbrdepmax, 
+    i, j, j_, k, k_, f, temp, phiG, pi, pdi, pddi, p, pd, pdd, q, nbr_relative, elastic_dof_idx, 
+    SIMPLIFY, SMALL_ELAST,INPUTS, STATES, WITH_LINEAR, WITH_ACCELERATIONS, EXTERNAL, DEXT_VARS, EXT_VARS, EXT_PARAM, F_EXT, 
+    title, mass, IG, gravity, T0G, TrefG, elastic_dof, ebody, BodyRef, T0Gd, R0G, R0Gd, MatRot, omega, omega_z, omega_, omegad, vG, vG_z, vG_, aG, nbrdof, nbrz, nbrbody, nbrdep, vGpartial, omegapartial, z_list: [], node_forces: [], vGpartial_z, omegapartial_z,
+    qi, qdi, Ixx, Iyy, Izz, Ixy, Ixz, Iyz], 
+    local(temp, phiG, mass, IG, gravity, T0G, TrefG, elastic_dof, ebody, BodyRef, T0Gd, R0G, R0Gd, MatRot, omega, omega_z, omega_, omegad, vG, vG_z, vG_, aG, vGpartial, omegapartial, vGpartial_z, omegapartial_, qi, qdi, Ixx, Iyy, Izz, Ixy, Ixz, Iyz, pi, pdi, pddi, p, pd, pdd, q, qi, qdi, FinalTime, StepSave, StepMax, EXTERNAL, DEXT_VARS, EXT_VARS, EXT_PARAM, F_EXT),
+
+
+    /* Program initialization. */
+    print("reading file ", file),
+
+    keepfloat: true,
+    ratprint: false,
+    load(file),
+
+    /* Option flags initialization. */
+    if SIMPLIFY='SIMPLIFY then SIMPLIFY: 1,
+    if SMALL_ELAST='SMALL_ELAST then SMALL_ELAST: 0,
+    if WITH_LINEAR='WITH_LINEAR then WITH_LINEAR: 1,
+    if WITH_ACCELERATIONS='WITH_ACCELERATIONS then WITH_ACCELERATIONS: 0,
+    if WITH_LINEAR#1 then WITH_ACCELERATIONS: 0,
+    if INPUTS='INPUTS then INPUTS: [],
+    if STATES='STATES then STATES: [],
+    if EXTERNAL='EXTERNAL then EXTERNAL: [],
+    if EXT_PARAM='EXT_PARAM then EXT_PARAM: [],
+    if F_EXT='F_EXT then F_EXT: [],
+    if FinalTime='FinalTime then FinalTime: 10.0,
+    if StepSave='StepSave then StepSave: 0.01,
+    if StepMax='StepMax then StepMax: 0.01,
+    
+    if not(member(TrefG, arrays)) then TrefG[0]: [],
+    if not(member(elastic_dof, arrays)) then elastic_dof[0]: [],
+    nbrbody: lmax(append(flatten(rest(arrayinfo(T0G), 2)), flatten(rest(arrayinfo(TrefG), 2)))),
+    nbrdof: max(lmax(flatten(map(args, sublist(listofvars([listarray(T0G), listarray(TrefG), listarray(elastic_dof)]), lambda([x], subvarp(x) and op(x)='q))))), 0),
+    nbrz: max(lmax(flatten(map(args, sublist(listofvars([listarray(T0G), listarray(TrefG)]), lambda([x], subvarp(x) and op(x)='z))))), 0),
+    for i: 1 thru nbrz do z_list: endcons(z[i], z_list),
+    if member('pi, arrays) then nbrdep: lmax(flatten(rest(arrayinfo(pi), 2))) else nbrdep: 0,
+    if gravity='gravity then gravity: [0.0, 0.0, -9.81],
+    nbrin: length(INPUTS),
+            
+    IG: makelist(zeromatrix(3, 3), i, 1, nbrbody),
+    for i:1 thru nbrbody do (
+        if member('Ixx, arrays) and member(i, flatten(rest(arrayinfo(Ixx), 2))) then IG[i][1, 1]: Ixx[i],
+        if member('Iyy, arrays) and member(i, flatten(rest(arrayinfo(Iyy), 2))) then IG[i][2, 2]: Iyy[i],
+        if member('Izz, arrays) and member(i, flatten(rest(arrayinfo(Izz), 2))) then IG[i][3, 3]: Izz[i],
+        if member('Ixy, arrays) and member(i, flatten(rest(arrayinfo(Ixy), 2))) then (IG[i][1, 2]: Ixy[i], IG[i][2, 1]: Ixy[i]),
+        if member('Ixz, arrays) and member(i, flatten(rest(arrayinfo(Ixz), 2))) then (IG[i][1, 3]: Ixz[i], IG[i][3, 1]: Ixz[i]),
+        if member('Iyz, arrays) and member(i, flatten(rest(arrayinfo(Iyz), 2))) then (IG[i][2, 3]: Iyz[i], IG[i][3, 2]: Iyz[i])
+    ),
+    for i:1 thru nbrdof do (
+        if not(member('qi, arrays)) or not(member(i, flatten(rest(arrayinfo(qi), 2)))) then qi[i]: 0.0,
+        if not(member('qdi, arrays)) or not(member(i, flatten(rest(arrayinfo(qdi), 2)))) then qdi[i]: 0.0
+    ),
+    
+    EXT_VARS: [],
+    DEXT_VARS: [],
+    kill(gradefs),
+    for i: 1 thru length(EXTERNAL) do (
+        f_name: op(EXTERNAL[i]),
+        f_args: args(EXTERNAL[i]),
+           
+        EXT_VARS: endcons(f_name, EXT_VARS),
+                                       
+        for j: 1 thru length(f_args) do (
+            if subvarp(f_args[j]) then
+                f_arg: concat(op(f_args[j]), args(f_args[j])[1])
+            else
+                f_arg: f_args[j],
+            df_darg: concat(d, f_name, "_d", f_arg),
+            apply(gradef, [f_name, f_args[j], df_darg]),
+            DEXT_VARS: endcons(df_darg, DEXT_VARS)
+        )
+    ),
+    
+    nbr_relative: 0,
+    zero_matrix:  zeromatrix(4, 4),
+    for i:1 thru nbrbody do (
+        if not(member(i, flatten(rest(arrayinfo(T0G), 2)))) or (T0G[i] = zero_matrix and BodyRef[i] # -1) then (
+            index_relative[i]: 1,
+            T0G[i]: TrefG[i],
+            nbr_relative: nbr_relative+1
+        ) else (
+            index_relative[i]: 0
+        ),
+        if member(i, flatten(rest(arrayinfo(elastic_dof), 2))) then (
+            elastic_dof[i]: sublist(elastic_dof[i], lambda([x], subvarp(x) and op(x)='q)),
+            elastic_dof_idx[i]: flatten(map(args, elastic_dof[i]))
+        ) else
+            elastic_dof_idx[i]: []
+            
+        /*T0G[i]: float(T0G[i])*/
+    ),
+
+    sysdef: new(sysdef_type),
+
+    sysdef@file: file,
+    sysdef@name: title,
+    sysdef@nbrdof: nbrdof,
+    sysdef@nbrcon: length(z_list),
+    sysdef@nbrbody: nbrbody,
+    sysdef@nbrin: nbrin,
+    sysdef@nbrdep: nbrdep,
+    sysdef@pi: makelist(pi[i], i, 1, nbrdep),
+    sysdef@gravity: makelist(gravity[i], i, 1, 3),
+    sysdef@mass: makelist(mass[i], i, 1, nbrbody),
+    sysdef@IG: makelist(IG[i], i, 1, nbrbody),
+    sysdef@T0G: makelist(simplify(T0G[i]), i, 1, nbrbody),
+    sysdef@z_list: makelist(z_list[i], i, 1, length(z_list)),
+    sysdef@node_forces: makelist(node_forces[i], i, 1, length(node_forces)),
+    sysdef@BodyRef: makelist(BodyRef[i], i, 1, nbrbody),
+    sysdef@ebody: makelist(ebody[i], i, 1, nbrbody),
+    sysdef@elastic_dof_idx: makelist(elastic_dof_idx[i], i, 1, nbrbody),
+    sysdef@FinalTime: FinalTime,
+    sysdef@StepSave: StepSave,
+    sysdef@StepMax: StepMax,
+    sysdef@qi: makelist(qi[i], i, 1, nbrdof),
+    sysdef@qdi: makelist(qdi[i], i, 1, nbrdof),
+    sysdef@appliedF: makelist(appliedF[i], i, 1, nbrbody),
+    sysdef@appliedM: makelist(appliedM[i], i, 1, nbrbody),
+    sysdef@appliedFe: makelist(appliedFe[i], i, 1, nbrbody),
+    sysdef@SIMPLIFY: SIMPLIFY,
+    sysdef@SMALL_ELAST: SMALL_ELAST,
+    sysdef@WITH_LINEAR: WITH_LINEAR,
+    sysdef@WITH_ACCELERATIONS: WITH_ACCELERATIONS,
+    sysdef@u: INPUTS,
+    sysdef@external: EXT_VARS,
+    sysdef@d_external: DEXT_VARS,
+    sysdef@ext_param: EXT_PARAM,
+    sysdef@f_ext: F_EXT,
+        
+    sysdef
+);
+

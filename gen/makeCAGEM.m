@@ -31,6 +31,7 @@ if exist(code_file, 'file')
     end
 end
 
+skip_gen= false;
 if ~skip_gen
     command_str= [
         maxima_path, ...
