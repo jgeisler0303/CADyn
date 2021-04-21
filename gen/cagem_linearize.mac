@@ -4,24 +4,20 @@ linearize(f, sys):= block([M, E, A, A1, A2, B, out, f_],
     f_: transpose(matrix(f)),
     M: zeromatrix(length(f_), 0),
     for i: 1 thru length(f_) do (
-        M: addcol(M, diff(f_, qdd[i]))
+        M: addcol(M, diff(f_, sys@states_dd[i]))
     ),
     E: ratsimp(mat_unblocker(diag_matrix(identfor(M), M))),
-    /* E: subst([cos(3*q[2])=0, sin(3*q[2])=0, sin(q[2])=0, cos(q[2])=0, qd[2]^2=0], E)$ */
-    /* E: ratsimp(taytorat(taylor(E, [q[0], q[1], qd[0], qd[1]], 0, 0))); */
 
 
     A1: zeromatrix(length(f_), 0),
     for i: 1 thru length(f_) do (
-        A1: addcol(A1, diff(f_, q[i]))
+        A1: addcol(A1, diff(f_, sys@states[i]))
     ),
     A2: zeromatrix(length(f_), 0),
     for i: 1 thru length(f_) do (
-        A2: addcol(A2, diff(f_, qd[i]))
+        A2: addcol(A2, diff(f_, sys@states_d[i]))
     ),
     A: ratsimp(mat_unblocker(matrix([zerofor(A1), identfor(A1)], [-A1, -A2]))),
-    /* A: subst([cos(3*q[2])=0, sin(3*q[2])=0, sin(q[2])=0, cos(q[2])=0, qd[2]^2=0], A)$ */
-    /* A: ratsimp(taytorat(taylor(A, [q[0], q[1], qd[0], qd[1]], 0, 0)));*/
 
     out@Ap: jacobian(f, makelist(p[i], i, 1, sys@nbrdep)),
     out@Apd: jacobian(f, makelist(pd[i], i, 1, sys@nbrdep)),
@@ -33,17 +29,17 @@ linearize(f, sys):= block([M, E, A, A1, A2, B, out, f_],
     ),
     B: ratsimp(mat_unblocker(matrix([zerofor(B)], [-B]))),
     
-    out@dp_dq: jacobian(sys@pi, makelist(q[i], i, 1, sys@nbrdof)),
+    out@dp_dq: jacobian(sys@pi, makelist(sys@states[i], i, 1, sys@nbrdof)),
     out@dp_dp: jacobian(sys@pi, makelist(p[i], i, 1, sys@nbrdep)),
 
-    out@dpd_dq: jacobian(sys@pdi, makelist(q[i], i, 1, sys@nbrdof)),
-    out@dpd_dqd: jacobian(sys@pdi, makelist(qd[i], i, 1, sys@nbrdof)),
+    out@dpd_dq: jacobian(sys@pdi, makelist(sys@states[i], i, 1, sys@nbrdof)),
+    out@dpd_dqd: jacobian(sys@pdi, makelist(sys@states_d[i], i, 1, sys@nbrdof)),
     out@dpd_dp: jacobian(sys@pdi, makelist(p[i], i, 1, sys@nbrdep)),
     out@dpd_dpd: jacobian(sys@pdi, makelist(pd[i], i, 1, sys@nbrdep)),
 
-    out@dpdd_dq: jacobian(sys@pddi, makelist(q[i], i, 1, sys@nbrdof)),
-    out@dpdd_dqd: jacobian(sys@pddi, makelist(qd[i], i, 1, sys@nbrdof)),
-    out@dpdd_dqdd: jacobian(sys@pddi, makelist(qdd[i], i, 1, sys@nbrdof)),
+    out@dpdd_dq: jacobian(sys@pddi, makelist(sys@states[i], i, 1, sys@nbrdof)),
+    out@dpdd_dqd: jacobian(sys@pddi, makelist(sys@states_d[i], i, 1, sys@nbrdof)),
+    out@dpdd_dqdd: jacobian(sys@pddi, makelist(sys@states_dd[i], i, 1, sys@nbrdof)),
     out@dpdd_dp: jacobian(sys@pddi, makelist(p[i], i, 1, sys@nbrdep)),
     out@dpdd_dpd: jacobian(sys@pddi, makelist(pd[i], i, 1, sys@nbrdep)),
     out@dpdd_dpdd: jacobian(sys@pddi, makelist(pdd[i], i, 1, sys@nbrdep)),
@@ -56,13 +52,13 @@ linearize(f, sys):= block([M, E, A, A1, A2, B, out, f_],
 );
 
 linearizeOut(sys):= block([Cq, Cqd],
-    Cq: jacobian(sys@outputs, makelist(q[i], i, 1, sys@sys_abs@nbrdof)),
-    Cqd: jacobian(sys@outputs, makelist(qd[i], i, 1, sys@sys_abs@nbrdof)),
+    Cq: jacobian(sys@outputs, makelist(sys@sys_abs@states[i], i, 1, sys@sys_abs@nbrdof)),
+    Cqd: jacobian(sys@outputs, makelist(sys@sys_abs@states_d[i], i, 1, sys@sys_abs@nbrdof)),
     sys@f_lin@C: mat_unblocker(matrix([Cq, Cqd])),
     
     sys@f_lin@D: jacobian(sys@outputs, sys@sys_abs@u),
     
-    sys@f_lin@F: jacobian(sys@outputs, makelist(qdd[i], i, 1, sys@sys_abs@nbrdof)),
+    sys@f_lin@F: jacobian(sys@outputs, makelist(sys@sys_abs@states_dd[i], i, 1, sys@sys_abs@nbrdof)),
     
     sys
 );

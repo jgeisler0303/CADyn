@@ -218,16 +218,16 @@ calcElasticModeLumpedPrecomputed(PHI, rr, mm):= block([b, i, iPHI, jPHI, md, Ct,
     b
 );
 
-evalModalTaylor(t, edof_idx, eps):= block([r, i, j],
+evalModalTaylor(t, edof_idx, states, eps):= block([r, i, j],
     r: copy(t@M0),
     
     if t@order>0 then
         for i: 1 thru t@nq do
             if t@nelem>0 then (
                 for j: 1 thru t@nelem do
-                    r[j]: r[j] + t@M1[i][j]*q[edof_idx[i]]*eps /* eps? */
+                    r[j]: r[j] + t@M1[i][j]*states[edof_idx[i]]*eps /* eps? */
             ) else
-                r: r + t@M1[i]*q[edof_idx[i]]*eps, /* eps? */
+                r: r + t@M1[i]*states[edof_idx[i]]*eps, /* eps? */
             
     r
 );

@@ -78,6 +78,10 @@ cagem_gen_cpp_direct(sysdef, [varargs]):= block([i, j, i_, j_, file, title, nbrd
     nbrdep: sysdef@sys_rel@nbrdep,
     nbrin: sysdef@sys_rel@nbrin,
     u: sysdef@sys_rel@u,
+    default_states: sysdef@sys_rel@default_states,
+    states: sysdef@sys_rel@states,
+    states_d: sysdef@sys_rel@states_d,
+    states_dd: sysdef@sys_rel@states_dd,
     y: make_c_index(sysdef@outputs, nbrdof, nbrdep),
     external: sysdef@sys_rel@external,
     d_external: sysdef@sys_rel@d_external,
@@ -122,6 +126,15 @@ cagem_gen_cpp_direct(sysdef, [varargs]):= block([i, j, i_, j_, file, title, nbrd
             const_matrix_once: 1,
     
     subst_list: [],
+    if default_states=0 then (
+        for i:1 thru nbrdof do (
+            subst_list: endcons(sysdef@sys_rel@states[i]='q[i-1], subst_list),
+            subst_list: endcons(sysdef@sys_rel@states_d[i]='qd[i-1], subst_list),
+            subst_list: endcons(sysdef@sys_rel@states_dd[i]='qdd[i-1], subst_list)
+        )
+    ),
+    for i:1 thru nbrin do
+        subst_list: endcons(sysdef@sys_rel@u[i]='u[i-1], subst_list),
     for i:1 thru nbrin do
         subst_list: endcons(sysdef@sys_rel@u[i]='u[i-1], subst_list),
     for i:1 thru length(sysdef@params) do

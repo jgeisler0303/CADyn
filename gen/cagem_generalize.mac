@@ -17,7 +17,7 @@ generalizedBalance(sysdef, bodyforces):= block([f, ibody, inode, iedof, idof, if
 
         for iedof: 1 thru length(sysdef@elastic_dof_idx[ibody]) do (
             idof: sysout@elastic_dof_idx[ibody][iedof],
-            bodyforces@Re[ibody]: bodyforces@Re[ibody] + transpose(c_force . sysdef@ebody[ibody]@frame[iframe]@phi@M1[idof]) * q[idof]*eps /* eps? */
+            bodyforces@Re[ibody]: bodyforces@Re[ibody] + transpose(c_force . sysdef@ebody[ibody]@frame[iframe]@phi@M1[idof]) * sysdef@states[idof]*eps /* eps? */
         )
     ),
         

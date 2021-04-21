@@ -14,8 +14,14 @@ prepareKinematics(sysdef):= block([
 
     time0: elapsed_run_time(),
     
-    depends(p, t),    
-    depends(q, t),
+    depends(p, t),
+    /* TODO: also make p a namable list */
+    
+    if sysdef@default_states=1 then
+        depends(q, t)
+    else
+        for i:1 thru sysdef@nbrdof do
+            depends(sysdef@states[i], t),
 
     for i: 1 thru length(sysdef@z_list) do 
         depends(op(sysdef@z_list[i]), t),
@@ -99,83 +105,62 @@ prepareKinematics(sysdef):= block([
     /* TODO may be handled more elegantly by gradef */
     for i:1 thru sysdef@nbrbody do (
         for j:1 thru sysdef@nbrdof do (
-            j_: j,
-            vG[i]: subst(qdd[j_], diff(q[j],t,2), vG[i]),
-            vG[i]: subst(qd[j_], diff(q[j],t), vG[i]),
-            vG[i]: subst(q[j_], q[j], vG[i]),
-            omega[i]: subst(qdd[j_], diff(q[j],t,2), omega[i]),
-            omega[i]: subst(qd[j_], diff(q[j],t), omega[i]),
-            omega[i]: subst(q[j_], q[j], omega[i]),
-            vG_z[i]: subst(qdd[j_], diff(q[j],t,2), vG_z[i]),
-            vG_z[i]: subst(qd[j_], diff(q[j],t), vG_z[i]),
-            vG_z[i]: subst(q[j_], q[j], vG_z[i]),
-            omega_z[i]: subst(qdd[j_], diff(q[j],t,2), omega_z[i]),
-            omega_z[i]: subst(qd[j_], diff(q[j],t), omega_z[i]),
-            omega_z[i]: subst(q[j_], q[j], omega_z[i]),
-            aG[i]: subst(qdd[j_], diff(q[j],t,2), aG[i]),
-            aG[i]: subst(qd[j_], diff(q[j],t), aG[i]),
-            aG[i]: subst(q[j_], q[j], aG[i]),
-            omegad[i]: subst(qdd[j_], diff(q[j],t,2), omegad[i]),
-            omegad[i]: subst(qd[j_], diff(q[j],t), omegad[i]),
-            omegad[i]: subst(q[j_], q[j], omegad[i]),
-            sysdef@T0G[i]: subst(qdd[j_], diff(q[j],t,2), sysdef@T0G[i]),
-            sysdef@T0G[i]: subst(qd[j_], diff(q[j],t), sysdef@T0G[i]),
-            sysdef@T0G[i]: subst(q[j_], q[j], sysdef@T0G[i]),
-            T0Gd[i]: subst(qdd[j_], diff(q[j],t,2), T0Gd[i]),
-            T0Gd[i]: subst(qd[j_], diff(q[j],t), T0Gd[i]),
-            T0Gd[i]: subst(q[j_], q[j], T0Gd[i])
+            vG[i]: subst(sysdef@states_dd[j], diff(sysdef@states[j],t,2), vG[i]),
+            vG[i]: subst(sysdef@states_d[j], diff(sysdef@states[j],t), vG[i]),
+            omega[i]: subst(sysdef@states_dd[j], diff(sysdef@states[j],t,2), omega[i]),
+            omega[i]: subst(sysdef@states_d[j], diff(sysdef@states[j],t), omega[i]),
+            vG_z[i]: subst(sysdef@states_dd[j], diff(sysdef@states[j],t,2), vG_z[i]),
+            vG_z[i]: subst(sysdef@states_d[j], diff(sysdef@states[j],t), vG_z[i]),
+            omega_z[i]: subst(sysdef@states_dd[j], diff(sysdef@states[j],t,2), omega_z[i]),
+            omega_z[i]: subst(sysdef@states_d[j], diff(sysdef@states[j],t), omega_z[i]),
+            aG[i]: subst(sysdef@states_dd[j], diff(sysdef@states[j],t,2), aG[i]),
+            aG[i]: subst(sysdef@states_d[j], diff(sysdef@states[j],t), aG[i]),
+            omegad[i]: subst(sysdef@states_dd[j], diff(sysdef@states[j],t,2), omegad[i]),
+            omegad[i]: subst(sysdef@states_d[j], diff(sysdef@states[j],t), omegad[i]),
+            sysdef@T0G[i]: subst(sysdef@states_dd[j], diff(sysdef@states[j],t,2), sysdef@T0G[i]),
+            sysdef@T0G[i]: subst(sysdef@states_d[j], diff(sysdef@states[j],t), sysdef@T0G[i]),
+            T0Gd[i]: subst(sysdef@states_dd[j], diff(sysdef@states[j],t,2), T0Gd[i]),
+            T0Gd[i]: subst(sysdef@states_d[j], diff(sysdef@states[j],t), T0Gd[i])
         ),
         for j:1 thru sysdef@nbrdep do (
-            j_: j,
-            vG[i]: subst(pdd[j_], diff(p[j],t,2), vG[i]),
-            vG[i]: subst(pd[j_], diff(p[j],t), vG[i]),
-            vG[i]: subst(p[j_], p[j], vG[i]),
-            omega[i]: subst(pdd[j_], diff(p[j],t,2), omega[i]),
-            omega[i]: subst(pd[j_], diff(p[j],t), omega[i]),
-            omega[i]: subst(p[j_], p[j], omega[i]),
-            vG_z[i]: subst(pdd[j_], diff(p[j],t,2), vG_z[i]),
-            vG_z[i]: subst(pd[j_], diff(p[j],t), vG_z[i]),
-            vG_z[i]: subst(p[j_], p[j], vG_z[i]),
-            omega_z[i]: subst(pdd[j_], diff(p[j],t,2), omega_z[i]),
-            omega_z[i]: subst(pd[j_], diff(p[j],t), omega_z[i]),
-            omega_z[i]: subst(p[j_], p[j], omega_z[i]),
-            aG[i]: subst(pdd[j_], diff(p[j],t,2), aG[i]),
-            aG[i]: subst(pd[j_], diff(p[j],t), aG[i]),
-            aG[i]: subst(p[j_], p[j], aG[i]),
-            omegad[i]: subst(pdd[j_], diff(p[j],t,2), omegad[i]),
-            omegad[i]: subst(pd[j_], diff(p[j],t), omegad[i]),
-            omegad[i]: subst(p[j_], p[j], omegad[i]),
-            sysdef@T0G[i]: subst(pdd[j_], diff(p[j],t,2), sysdef@T0G[i]),
-            sysdef@T0G[i]: subst(pd[j_], diff(p[j],t), sysdef@T0G[i]),
-            sysdef@T0G[i]: subst(p[j_], p[j], sysdef@T0G[i]),
-            T0Gd[i]: subst(pdd[j_], diff(p[j],t,2), T0Gd[i]),
-            T0Gd[i]: subst(pd[j_], diff(p[j],t), T0Gd[i]),
-            T0Gd[i]: subst(p[j_], p[j], T0Gd[i])
+            vG[i]: subst(pdd[j], diff(p[j],t,2), vG[i]),
+            vG[i]: subst(pd[j], diff(p[j],t), vG[i]),
+            omega[i]: subst(pdd[j], diff(p[j],t,2), omega[i]),
+            omega[i]: subst(pd[j], diff(p[j],t), omega[i]),
+            vG_z[i]: subst(pdd[j], diff(p[j],t,2), vG_z[i]),
+            vG_z[i]: subst(pd[j], diff(p[j],t), vG_z[i]),
+            omega_z[i]: subst(pdd[j], diff(p[j],t,2), omega_z[i]),
+            omega_z[i]: subst(pd[j], diff(p[j],t), omega_z[i]),
+            aG[i]: subst(pdd[j], diff(p[j],t,2), aG[i]),
+            aG[i]: subst(pd[j], diff(p[j],t), aG[i]),
+            omegad[i]: subst(pdd[j], diff(p[j],t,2), omegad[i]),
+            omegad[i]: subst(pd[j], diff(p[j],t), omegad[i]),
+            sysdef@T0G[i]: subst(pdd[j], diff(p[j],t,2), sysdef@T0G[i]),
+            sysdef@T0G[i]: subst(pd[j], diff(p[j],t), sysdef@T0G[i]),
+            T0Gd[i]: subst(pdd[j], diff(p[j],t,2), T0Gd[i]),
+            T0Gd[i]: subst(pd[j], diff(p[j],t), T0Gd[i])
         ),
         for j:1 thru length(sysdef@z_list) do (
-            j_: j,
-            vG_z[i]: subst(zd[j_], diff(sysdef@z_list[j],t), vG_z[i]),
-            omega_z[i]: subst(zd[j_], diff(sysdef@z_list[j],t), omega_z[i])
+            vG_z[i]: subst(zd[j], diff(sysdef@z_list[j],t), vG_z[i]),
+            omega_z[i]: subst(zd[j], diff(sysdef@z_list[j],t), omega_z[i])
         )
     ),
     for k:1 thru sysdef@nbrdep do (
         for j:1 thru sysdef@nbrdof do (
-            j_: j,
-            sysdef@pi[k]: subst(q[j_], q[j], sysdef@pi[k]),
-            pdi[k]: subst(qd[j_], diff(q[j],t), pdi[k]),
-            pdi[k]: subst(q[j_], q[j], pdi[k]),
-            pddi[k]: subst(qdd[j_], diff(q[j],t, 2), pddi[k]),
-            pddi[k]: subst(qd[j_], diff(q[j],t), pddi[k]),
-            pddi[k]: subst(q[j_], q[j], pddi[k])
+            sysdef@pi[k]: subst(sysdef@states[j], sysdef@states[j], sysdef@pi[k]),
+            pdi[k]: subst(sysdef@states_d[j], diff(sysdef@states[j],t), pdi[k]),
+            pdi[k]: subst(sysdef@states[j], sysdef@states[j], pdi[k]),
+            pddi[k]: subst(sysdef@states_dd[j], diff(sysdef@states[j],t, 2), pddi[k]),
+            pddi[k]: subst(sysdef@states_d[j], diff(sysdef@states[j],t), pddi[k]),
+            pddi[k]: subst(sysdef@states[j], sysdef@states[j], pddi[k])
         ),
         for j:1 thru sysdef@nbrdep do (
-            j_: j,
-            sysdef@pi[k]: subst(p[j_], p[j], sysdef@pi[k]),
-            pdi[k]: subst(pd[j_], diff(p[j],t), pdi[k]),
-            pdi[k]: subst(p[j_], p[j], pdi[k]),
-            pddi[k]: subst(pdd[j_], diff(p[j],t, 2), pddi[k]),
-            pddi[k]: subst(pd[j_], diff(p[j],t), pddi[k]),
-            pddi[k]: subst(p[j_], p[j], pddi[k])
+            sysdef@pi[k]: subst(p[j], p[j], sysdef@pi[k]),
+            pdi[k]: subst(pd[j], diff(p[j],t), pdi[k]),
+            pdi[k]: subst(p[j], p[j], pdi[k]),
+            pddi[k]: subst(pdd[j], diff(p[j],t, 2), pddi[k]),
+            pddi[k]: subst(pd[j], diff(p[j],t), pddi[k]),
+            pddi[k]: subst(p[j], p[j], pddi[k])
         )
     ),
 
@@ -183,7 +168,6 @@ prepareKinematics(sysdef):= block([
     
     for i:1 thru sysdef@nbrbody do (
         for j:1 thru sysdef@nbrdof do (
-            j_: j,
             vG_: vG[i],
             omega_: omega[i],
             for k: sysdef@nbrdep step -1 thru 1 do (
@@ -194,11 +178,10 @@ prepareKinematics(sysdef):= block([
                 omega_: subst(pi[k], p[k_], omega_)
             ),
             
-            vGpartial[i, j]: diff(vG_, qd[j_]),
-            omegapartial[i, j]: diff(omega_, qd[j_])
+            vGpartial[i, j]: diff(vG_, sysdef@states_d[j]),
+            omegapartial[i, j]: diff(omega_, sysdef@states_d[j])
         ),
         for j:1 thru length(sysdef@z_list) do (
-            j_: j,
             for k: sysdef@nbrdep step -1 thru 1 do (
                 k_: k,
                 vG_z[i]: subst(pdi[k], pd[k_], vG_z[i]),
@@ -206,8 +189,8 @@ prepareKinematics(sysdef):= block([
                 omega_z[i]: subst(pdi[k], pd[k_], omega_z[i]),
                 omega_z[i]: subst(pi[k], p[k_], omega_z[i])
             ),
-            vGpartial_z[i, j]: diff(vG_z[i], zd[j_]),
-            omegapartial_z[i, j]: diff(omega_z[i], zd[j_])
+            vGpartial_z[i, j]: diff(vG_z[i], zd[j]),
+            omegapartial_z[i, j]: diff(omega_z[i], zd[j])
         )
     ),
     
