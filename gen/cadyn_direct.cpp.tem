@@ -8,8 +8,8 @@
 #include <cstdio>
 #include <ctime>
 
-<<gentran(literal("\/\* File generated form template cadyn_direct.cpp.tem on ", eval(timedate()), ". Do not edit! \*\/", cr))>>
-<<gentran(literal("\/\* Multibody system: ", eval(title), " \*\/", cr, cr))>>
+<<gentran(literal("\/\* File generated form template cadyn_direct.cpp.tem on ", eval(timedate()), ". Do not edit! \*\/", cr))$>>
+<<gentran(literal("\/\* Multibody system: ", eval(title), " \*\/", cr, cr))$>>
 
 #define mcond(c, a, x, b) ((c)? a:b)
 
@@ -50,9 +50,9 @@ double ParameterInfo::getParam() {
     return data[0];
 }
 
-class <<gentran(literal(eval(filename), "Parameters"))>> {
+class <<gentran(literal(eval(filename), "Parameters"))$>> {
 public:
-    <<gentran(literal(eval(filename), "Parameters"))>>();
+    <<gentran(literal(eval(filename), "Parameters"))$>>();
     void setParam(const std::string &name, const double *value);
     double getParam(const std::string &name);
     void setFromFile(const std::string &fileName);
@@ -71,12 +71,12 @@ public:
         ) else
             gentran(literal("    double ", eval(params[i]), "\;", cr))
     )
-)>>
+)$>>
 };
 
-<<gentran(literal(eval(filename), "Parameters"))>>::<<gentran(literal(eval(filename), "Parameters"))>>() :
+<<gentran(literal(eval(filename), "Parameters"))$>>::<<gentran(literal(eval(filename), "Parameters"))$>>() :
     info_map(),
-    unsetParams(<<gentran(literal(eval(length(params))))>>) {
+    unsetParams(<<gentran(literal(eval(length(params))))$>>) {
 <<block([],
     for i:1 thru length(params) do (
         if subvarp(params[i]) then (
@@ -87,9 +87,9 @@ public:
         ) else
             gentran(literal("    info_map[\"", eval(params[i]), "\"]= ParameterInfo(&", eval(params[i]), ", 1, 1)\;", cr))
     )
-)>>}
+)$>>}
 
-void <<gentran(literal(eval(filename), "Parameters"))>>::setParam(const std::string &name, const double *value) {
+void <<gentran(literal(eval(filename), "Parameters"))$>>::setParam(const std::string &name, const double *value) {
     auto it = info_map.find(name);
     if(it==info_map.end())    
         throw std::runtime_error("Unknown parameter \"" + name + "\".");
@@ -98,7 +98,7 @@ void <<gentran(literal(eval(filename), "Parameters"))>>::setParam(const std::str
         unsetParams--;
 }
 
-double <<gentran(literal(eval(filename), "Parameters"))>>::getParam(const std::string &name) {
+double <<gentran(literal(eval(filename), "Parameters"))$>>::getParam(const std::string &name) {
     auto it = info_map.find(name);
     if(it==info_map.end())    
         throw std::runtime_error("Unknown parameter \"" + name + "\".");
@@ -106,7 +106,7 @@ double <<gentran(literal(eval(filename), "Parameters"))>>::getParam(const std::s
     return it->second.getParam();    
 }
 
-void <<gentran(literal(eval(filename), "Parameters"))>>::setFromFile(const std::string &fileName) {
+void <<gentran(literal(eval(filename), "Parameters"))$>>::setFromFile(const std::string &fileName) {
     std::ifstream infile(fileName);
     
     if(infile.is_open()) {
@@ -116,7 +116,7 @@ void <<gentran(literal(eval(filename), "Parameters"))>>::setFromFile(const std::
             std::istringstream iss(line);
             
             std::string paramName;
-            iss >> paramName;
+            iss <<gentran(literal(">>"))$>> paramName;
             
             if(paramName.empty() || (paramName[0]=='*' || paramName[0]=='#')) // comment or empty line
                 continue;
@@ -139,7 +139,7 @@ void <<gentran(literal(eval(filename), "Parameters"))>>::setFromFile(const std::
                     iss.str(line);
                 }                    
                 for(int c= 0; c<it->second.ncols; ++c) {
-                    iss >> value(r, c);
+                    iss <<gentran(literal(">>"))$>> value(r, c);
                     if(iss.fail()) {
                         fprintf(stderr, "Could not read value for parameter \"%s(%d, %d)\" in line %d.\n", paramName.c_str(), r, c, i);
                         fail= true;
@@ -161,7 +161,7 @@ void <<gentran(literal(eval(filename), "Parameters"))>>::setFromFile(const std::
         throw std::runtime_error("Could not open file \"" + fileName + "\"");
 }   
     
-bool <<gentran(literal(eval(filename), "Parameters"))>>::unsetParamsWithMsg() {
+bool <<gentran(literal(eval(filename), "Parameters"))$>>::unsetParamsWithMsg() {
     if(unsetParams) {
         fprintf(stderr, "The following parameters are not set:\n");
         for(auto const &i : info_map) {
@@ -174,14 +174,14 @@ bool <<gentran(literal(eval(filename), "Parameters"))>>::unsetParamsWithMsg() {
 }
 
             
-class <<gentran(literal(eval(filename), "System"))>>: public ODEOrder2 {
+class <<gentran(literal(eval(filename), "System"))$>>: public ODEOrder2 {
 public:
-    static const int nStates= <<gentran(literal(eval(nbrdof)))>>;
-    static const int nInputs= <<gentran(literal(eval(nbrin)))>>;
-    static const int nOutputs= <<gentran(literal(eval(length(y))))>>;
-    static const int nbrdep= <<gentran(literal(eval(nbrdep)))>>;
+    static const int nStates= <<gentran(literal(eval(nbrdof)))$>>;
+    static const int nInputs= <<gentran(literal(eval(nbrin)))$>>;
+    static const int nOutputs= <<gentran(literal(eval(length(y))))$>>;
+    static const int nbrdep= <<gentran(literal(eval(nbrdep)))$>>;
     
-    <<gentran(literal(eval(filename), "System"))>>(); 
+    <<gentran(literal(eval(filename), "System"))$>>(); 
         
     void precalcConsts();
     virtual VecX computeResiduals();
@@ -194,9 +194,9 @@ public:
         gentran(literal("    void calculateExternal()\;", cr)),
         gentran(literal("    void calculateExternalWithDeriv()\;", cr))
     )
-)>>
+)$>>
     
-    <<gentran(literal(eval(filename), "Parameters"))>> param;
+    <<gentran(literal(eval(filename), "Parameters"))$>> param;
     
 // private:
     VecX p, pd, pdd;
@@ -253,7 +253,7 @@ public:
         ),            
         gentran(literal("    } states_idx\;", cr))
     )
-)>>
+)$>>
     
 <<block([i], 
     for i:1 thru length(external) do
@@ -261,18 +261,18 @@ public:
         
     for i:1 thru length(d_external) do
         gentran(literal("    double ", eval(d_external[i]), "\;", cr))
-)>>
+)$>>
 
 <<block([i], 
     for i:1 thru length(pre_calc_const) do
         gentran(literal("    double ", eval(first(pre_calc_const[i])), "\;", cr))
-)>>
+)$>>
 };
 
-const int <<gentran(literal(eval(filename)))>>System::nbrdep;
+const int <<gentran(literal(eval(filename)))$>>System::nbrdep;
 
-<<gentran(literal(eval(filename), "System"))>>::<<gentran(literal(eval(filename), "System"))>>() : 
-    ODEOrder2(nStates, nInputs, nOutputs, "<<gentran(literal(eval(filename)))>>", "<<gentran(literal(eval(title)))>>"),
+<<gentran(literal(eval(filename), "System"))$>>::<<gentran(literal(eval(filename), "System"))$>>() : 
+    ODEOrder2(nStates, nInputs, nOutputs, "<<gentran(literal(eval(filename)))$>>", "<<gentran(literal(eval(title)))$>>"),
     param(),
     p(nbrdep),
     pd(nbrdep),
@@ -295,9 +295,9 @@ const int <<gentran(literal(eval(filename)))>>System::nbrdep;
         )
     ),
     gentran(literal(")", cr))
-)>>{
+)$>>{
 <<block([i, i_, opt], 
-        ?ccurrind\*: 4,
+        ccurrind: 4,
         save_subst_list: subst_list,
         subst_list: [],
         
@@ -313,9 +313,9 @@ const int <<gentran(literal(eval(filename)))>>System::nbrdep;
             )
         ),
         subst_list: save_subst_list
-)>>}
+)$>>}
 
-void <<gentran(literal(eval(filename)))>>System::precalcConsts() {
+void <<gentran(literal(eval(filename)))$>>System::precalcConsts() {
 <<block([i], 
     for i:1 thru length(pre_calc_const) do
         do_assign(first(pre_calc_const[i]), second(pre_calc_const[i])),
@@ -338,20 +338,20 @@ void <<gentran(literal(eval(filename)))>>System::precalcConsts() {
         gentran(literal(cr)),
         genmat(F, length(y), nbrdof, 0, 0, "F", 2)
     )
-)>>    
+)$>>    
 }
 
-VecX <<gentran(literal(eval(filename)))>>System::computeResiduals() {
+VecX <<gentran(literal(eval(filename)))$>>System::computeResiduals() {
     VecX f_(nbrdof);
     
 <<block([], 
     if length(external) > 0 then (
         gentran(literal("    calculateExternal()\;", cr, cr))
     )
-)>>
-
+)$>>
+    {
 <<block([i, i_, opt], 
-    ?ccurrind\*: 8,
+    ccurrind: 8,
 
     if nbrdep > 0 then (
         gentran(literal("    // Dependant variables", cr)),
@@ -369,11 +369,11 @@ VecX <<gentran(literal(eval(filename)))>>System::computeResiduals() {
         ),
         gentran("    }", literal(cr))        
     )
-)>>
-
+)$>>
+    }
     {
 <<block([i, i_, opt], 
-    ?ccurrind\*: 8,
+    ccurrind: 8,
 
     opt: genopt([f]),
     gentran(literal(cr)),
@@ -382,20 +382,21 @@ VecX <<gentran(literal(eval(filename)))>>System::computeResiduals() {
         i_: i-1,
         do_assign(concat("f_[", i_, "]"), opt[1][i])
     )
-)>>
+)$>>
     }
 
     return f_;
 }
 
-void <<gentran(literal(eval(filename)))>>System::calcJacobian(double alphaM, double alphaC, double alphaK) {
+void <<gentran(literal(eval(filename)))$>>System::calcJacobian(double alphaM, double alphaC, double alphaK) {
 <<block([], 
     if length(external) > 0 then (
         gentran(literal("    calculateExternalWithDeriv()\;", cr))
     )
-)>>
+)$>>
+    {
 <<block([i, i_, opt], 
-    ?ccurrind\*: 8,
+    ccurrind: 8,
 
     if nbrdep > 0 then (
         gentran(literal("    // Dependant variables", cr)),
@@ -413,11 +414,11 @@ void <<gentran(literal(eval(filename)))>>System::calcJacobian(double alphaM, dou
         ),
         gentran("    }", literal(cr))        
     )
-)>>
-
+)$>>
+    }
     {
 <<block([i, i_, j, j_, opt], 
-    ?ccurrind\*: 8,
+    ccurrind: 8,
     
     if const_matrix_once=1 then (    
         E_no_const: matrixmap(lambda([e], if constantp(e) then 0 else e), E),        
@@ -512,7 +513,7 @@ void <<gentran(literal(eval(filename)))>>System::calcJacobian(double alphaM, dou
         i_: i-1,
         do_assign(concat("f[", i_, "]"), opt[1][i])
     )
-)>>
+)$>>
     }
     
     Jacobian= alphaM*M + alphaC*C + alphaK*K;
@@ -525,9 +526,10 @@ void <<gentran(literal(eval(filename)))>>System::calcJacobian(double alphaM, dou
     }
 }
 
-void <<gentran(literal(eval(filename)))>>System::calcB() {
+void <<gentran(literal(eval(filename)))$>>System::calcB() {
+    {
 <<block([opt], 
-    ?ccurrind\*: 4,
+    ccurrind: 8,
     
     if const_matrix_once=1 then (    
         B_no_const: matrixmap(lambda([e], if constantp(e) then 0 else e), B)
@@ -539,12 +541,14 @@ void <<gentran(literal(eval(filename)))>>System::calcB() {
     gentran(literal(cr)),
     
     genmat(opt[1], nbrdof, nbrin, nbrdof, 0, "B", const_matrix_once)
-)>>
+)$>>
+    }
 }
 
-void <<gentran(literal(eval(filename)))>>System::calcCDF() {
+void <<gentran(literal(eval(filename)))$>>System::calcCDF() {
+    {
 <<block([opt], 
-    ?ccurrind\*: 4,
+    ccurrind: 8,
 
     if const_matrix_once=1 then (    
         C_no_const: matrixmap(lambda([e], if constantp(e) then 0 else e), C),
@@ -570,12 +574,14 @@ void <<gentran(literal(eval(filename)))>>System::calcCDF() {
     genmat(opt[3], length(y), nbrin, 0, 0, "CD.block(0, 2*nbrdof, nbrout, nbrin)", const_matrix_once),
     gentran(literal(cr)),
     genmat(opt[4], length(y), nbrdof, 0, 0, "F", const_matrix_once)
-)>>
+)$>>
+    }
 }
 
-void <<gentran(literal(eval(filename)))>>System::calcOut() {
+void <<gentran(literal(eval(filename)))$>>System::calcOut() {
+    {
 <<block([opt], 
-    ?ccurrind\*: 4,
+    ccurrind: 8,
     
     opt: genopt([y]),
         
@@ -583,12 +589,13 @@ void <<gentran(literal(eval(filename)))>>System::calcOut() {
         i_: i-1,
         do_assign(concat("y[", i_, "]"), opt[1][i])
     )
-)>>
+)$>>
+    }
 }
 
 <<block([], 
     if length(external) > 0 then (
         gentran(literal("#include \"", eval(filename), "System_Externals.hpp\""))
     )
-)>>
+)$>>
 

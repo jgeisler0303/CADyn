@@ -63,18 +63,23 @@ cagem_acados(sysdef, [varargs]):= block([i, j, i_, j_, file, title, nbrdof, nbrb
     filename: pathname_name(file),
     
     load("gentran"),
-    gentranlang(c),
-    on('float),
-    off('gentranseg),
-    ?clinelen\*: 1000,            
-    gentranin(filename_merge(cagem_dir, "cadyn_acados.m.tem"), [openw(sconcat(filepath, filename, "_model.m"))]),
+    load(operatingsystem),
+    
+    gentranlang: 'c,
+    genfloat: true,
+    gentranseg: false,
+    clinelen: 1000,
+    
+    out_name: sconcat(filepath, filename, "_model.m"),
+    if file_search(out_name)#false then delete_file(out_name),
+    templ_name: ssubst("cadyn_acados.m.tem", "cagem.mac", cagem_dir),
+    gentranin(templ_name, [out_name]),
                                       
     ext_file: sconcat(filepath, filename, "_external.m"),
     if file_search(ext_file)=false then (
         ext_file_source: sconcat(pathname_directory(file), filename, "external.m"),
         
         if not(file_search(ext_file_source)=false) then (
-            load(operatingsystem),
             copy_file(ext_file_source, ext_file)
         )
     ),
@@ -84,10 +89,16 @@ cagem_acados(sysdef, [varargs]):= block([i, j, i_, j_, file, title, nbrdof, nbrb
         for i:1 thru length(sysdef@params) do
             subst_list: endcons(sysdef@params[i]=concat('param\., sysdef@params[i]), subst_list),
     
-        gentranin(filename_merge(cagem_dir, "cadyn_acados_pre_calc.m.tem"), [openw(sconcat(filepath, filename, "_pre_calc.m"))])
+        out_name: sconcat(filepath, filename, "_pre_calc.m"),
+        if file_search(out_name)#false then delete_file(out_name),
+        templ_name: ssubst("cadyn_acados_pre_calc.m.tem", "cagem.mac", cagem_dir),
+        gentranin(templ_name, [out_name])
     ),
     
-    gentranin(filename_merge(cagem_dir, "model_parameters.m.tem"), [openw(sconcat(filepath, "model_parameters.m"))])    
+    out_name: sconcat(filepath, filename, "model_parameters.m"),
+    if file_search(out_name)#false then delete_file(out_name),
+    templ_name: ssubst("model_parameters.m.tem", "cagem.mac", cagem_dir),
+    gentranin(templ_name, [out_name])
 );
 
 

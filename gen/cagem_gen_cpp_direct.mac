@@ -150,25 +150,34 @@ cagem_gen_cpp_direct(sysdef, [varargs]):= block([i, j, i_, j_, file, title, nbrd
     filename: pathname_name(file),
     
     load("gentran"),
-    gentranlang(c),
-    on('float),
-    off('gentranseg),
-    ?clinelen\*: 1000,            
-    gentranin(filename_merge(cagem_dir, "cadyn_direct.cpp.tem"), [openw(sconcat(filepath, filename, "System2.hpp"))]),
+    load(operatingsystem),
+
+    gentranlang: 'c,
+    genfloat: true,
+    gentranseg: false,
+    clinelen: 1000,
+    
+    out_name: sconcat(filepath, filename, "System2.hpp"),
+    if file_search(out_name)#false then delete_file(out_name),
+    templ_name: ssubst("cadyn_direct.cpp.tem", "cagem.mac", cagem_dir),
+    gentranin(templ_name, [out_name]),
                                       
     ext_file: sconcat(filepath, filename, "System_Externals.hpp"),
     if file_search(ext_file)=false then (
         ext_file_source: sconcat(pathname_directory(file), filename, "System_Externals.hpp"),
         
         if not(file_search(ext_file_source)=false) then (
-            load(operatingsystem),
             copy_file(ext_file_source, ext_file)
         ) else (
-            gentranin(filename_merge(cagem_dir, "cadyn_direct_external.hpp.tem"), [openw(ext_file)])
+            templ_name: ssubst("cadyn_direct_external.hpp.tem", "cagem.mac", cagem_dir),
+            gentranin(templ_name, [ext_file])
         )
     ),
 
-    gentranin(filename_merge(cagem_dir, "model_parameters.m.tem"), [openw(sconcat(filepath, "model_parameters.m"))])
+    out_name: concat(filepath, "model_parameters.m"),
+    if file_search(out_name)=true then delete_file(out_name),
+    templ_name: ssubst("model_parameters.m.tem", "cagem.mac", cagem_dir),
+    gentranin(templ_name, [out_name])
     
     /* app_file: sconcat(filepath, filename, "_app2.cpp"), */
     /* if file_search(app_file)=false then */

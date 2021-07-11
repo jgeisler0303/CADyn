@@ -1,14 +1,14 @@
-<<gentran(literal("%% File generated form template cadyn_acados.m.tem on ", eval(timedate()), ". Do not edit!", cr))>>
-<<gentran(literal("%% Multibody system: ", eval(title), cr, cr))>>
+<<gentran(literal("%% File generated form template cadyn_acados.m.tem on ", eval(timedate()), ". Do not edit!", cr))$>>
+<<gentran(literal("%% Multibody system: ", eval(title), cr, cr))$>>
 
-function model= <<gentran(literal(eval(filename)))>>_model()
+function model= <<gentran(literal(eval(filename)))$>>_model()
 
 import casadi.*
 
 % system dimensions
-nx = 2*<<gentran(literal(eval(nbrdof)))>>;
-nu = <<gentran(literal(eval(nbrin)))>>;
-ny = <<gentran(literal(eval(length(y))))>>;
+nx = 2*<<gentran(literal(eval(nbrdof)))$>>;
+nu = <<gentran(literal(eval(nbrin)))$>>;
+ny = <<gentran(literal(eval(length(y))))$>>;
 
 % system parameters
 model.name= mfilename;
@@ -17,21 +17,21 @@ stateName= {
 <<block([i], 
     for i:1 thru nbrdof do
         gentran(literal("    'q", eval(i), "'", cr))
-)>>};
+)$>>};
 makeCasADiNamedVector('q', stateName, model, 1, 1);
 
 dstateName= {
 <<block([i], 
     for i:1 thru nbrdof do
         gentran(literal("    'qd", eval(i), "'", cr))
-)>>};
+)$>>};
 makeCasADiNamedVector('qd', dstateName, model, 1, 1);
 
 ddstateName= {
 <<block([i], 
     for i:1 thru nbrdof do
         gentran(literal("    'qdd", eval(i), "'", cr))
-)>>};
+)$>>};
 makeCasADiNamedVector('qdd', ddstateName, model, 1, 1);
 
 sym_x= [q; qd];
@@ -42,11 +42,11 @@ sym_xdot= [xdot1; qdd];
 
 inputName= cell(nu, 1);
 <<block([i, i_, opt], 
-        ?ccurrind\*: 0,
+        ccurrind: 0,
         for i:1 thru nbrin do (
             do_assign(concat("inputName{", i, "}"), concat("'", u[i], "'"))
         )
-)>>
+)$>>
 makeCasADiNamedVector('sym_u', inputName, model, 1, 1);
 u= sym_u;
 
@@ -64,11 +64,11 @@ paramName= struct();
         ) else
             gentran(literal("paramName.", eval(params[i]), "= 1\;", cr))
     )
-)>>
+)$>>
 <<block([i], 
     for i:1 thru length(pre_calc_const) do
         gentran(literal("paramName.", eval(first(pre_calc_const[i])), "= 1\;", cr))
-)>>
+)$>>
 makeCasADiNamedVector('sym_p', paramName, model, 1, 1);
 
 
@@ -77,19 +77,19 @@ externalNames= {
 <<block([i], 
     for i:1 thru length(external) do
         gentran(literal("    '", eval(external[i]), "'", cr))
-)>>};
+)$>>};
 makeCasADiNamedVector('externals', externalNames, model, 1, 1);
         
 <<block([i], 
     if length(external) > 0 then (
         gentran(literal(eval(filename), "_external\;", cr))
     )
-)>>
+)$>>
     
 
 % implicit second order model
 <<block([i, i_, opt], 
-    ?ccurrind\*: 0,
+    ccurrind: 0,
 
     opt: genopt([f], f_temp),
     gentran(literal(cr)),
@@ -105,7 +105,7 @@ makeCasADiNamedVector('externals', externalNames, model, 1, 1);
             gentran(literal(", "))
     ),
     gentran(literal("]'\;", cr))    
-)>>
+)$>>
 
 
 % Implicit Nonlinear State-Space Model
@@ -114,7 +114,7 @@ f_impl_expr = [xdot1 - qd; f];
 
 % Outputs
 <<block([opt], 
-    ?ccurrind\*: 0,
+    ccurrind: 0,
     
     opt: genopt([y], out_temp),
         
@@ -129,7 +129,7 @@ f_impl_expr = [xdot1 - qd; f];
             gentran(literal(", "))
     ),
     gentran(literal("]'\;", cr))    
-)>>
+)$>>
 
 
 % populate structure

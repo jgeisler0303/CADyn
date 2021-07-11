@@ -118,16 +118,29 @@ cagem_gen_cpp_recursive(sysdef, [target_dir]):= block([i, j, i_, j_, file, title
     filename: pathname_name(file),
     
     load("gentran"),
-    gentranlang(c),
-    on('float),
-    off('gentranseg),
-    ?clinelen\*: 1000,            
+    load(operatingsystem),
+
+    gentranlang: 'c,
+    genfloat: true,
+    gentranseg: false,
+    clinelen: 1000,
+    
+    out_name: sconcat(filepath, filename, "System.hpp"),
+    if file_search(out_name)#false then delete_file(out_name),
+    templ_name: ssubst("cadyn_cpp.tem", "cagem.mac", cagem_dir),
+
     user_file: sconcat(filename, ".AppEff.hpp"),
-    gentranin(filename_merge(cagem_dir, "cadyn_cpp.tem"), [openw(sconcat(filepath, filename, "System.hpp"))]),
-                                      
+    gentranin(templ_name, [out_name]),
+    
     app_file: sconcat(filepath, filename, "_app.cpp"),
-    if file_search(app_file)=false then
-        gentranin(filename_merge(cagem_dir, "cadyn_cpp_app.tem"), [openw(app_file)])
+    if file_search(app_file)=false then (
+        app_file: sconcat(filepath, filename, "System.hpp"),
+        if file_search(app_file)#false then delete_file(app_file),
+        templ_name: ssubst("cadyn_cpp_app.tem", "cagem.mac", cagem_dir),
+
+        user_file: sconcat(filename, ".AppEff.hpp"),
+        gentranin(templ_name, [app_file])
+    )
 );
 
 

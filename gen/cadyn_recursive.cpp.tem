@@ -2,29 +2,29 @@
 #include "Body.hpp"
 #include "ElasticBody.hpp"
 
-<<gentran(literal("\/\* File generated form template cadyn_recursive.cpp.tem on ", eval(timedate()), ". Do not edit! \*\/", cr))>>
-<<gentran(literal("\/\* Multibody system: ", eval(title), " \*\/", cr, cr))>>
+<<gentran(literal("\/\* File generated form template cadyn_recursive.cpp.tem on ", eval(timedate()), ". Do not edit! \*\/", cr))$>>
+<<gentran(literal("\/\* Multibody system: ", eval(title), " \*\/", cr, cr))$>>
 
-class <<gentran(literal(eval(filename), "System"))>>: public MBSystem {
+class <<gentran(literal(eval(filename), "System"))$>>: public MBSystem {
 public:
-    static const int nStates= <<gentran(literal(eval(nbrdof)))>>;
-    static const int nInputs= <<gentran(literal(eval(nbrin)))>>;
+    static const int nStates= <<gentran(literal(eval(nbrdof)))$>>;
+    static const int nInputs= <<gentran(literal(eval(nbrin)))$>>;
     
-    <<gentran(literal(eval(filename), "System"))>>(); 
+    <<gentran(literal(eval(filename), "System"))$>>(); 
     virtual void computeMotion();
     virtual void computeAppliedEfforts();
 };
 
-<<gentran(literal(eval(filename), "System::",eval(filename), "System"))>>(): 
-    MBSystem(<<gentran(literal(eval(nbrbody)))>>, nStates, <<gentran(literal(eval(nbrdep)))>>, nInputs, "<<gentran(literal(eval(filename)))>>", "<<gentran(literal(eval(title)))>>") {
+<<gentran(literal(eval(filename), "System::",eval(filename), "System"))$>>(): 
+    MBSystem(<<gentran(literal(eval(nbrbody)))$>>, nStates, <<gentran(literal(eval(nbrdep)))$>>, nInputs, "<<gentran(literal(eval(filename)))$>>", "<<gentran(literal(eval(title)))$>>") {
         
 <<block(
-    ?ccurrind\*: 4,
+    ccurrind: 4,
     gentran(literal("    g << ", eval(float(gravity[1])), ", ", eval(float(gravity[2])), ", ", eval(float(gravity[3])), "\;", cr))
-    )>>
+    )$>>
     
 <<block([i, i_, j, k], 
-    ?ccurrind\*: 4,
+    ccurrind: 4,
     for i:1 thru nbrbody do (
         if length(elastic_dof_idx[i])>0 then (
             body_name: concat("ebody", i),
@@ -108,23 +108,23 @@ public:
         gentran(literal("    body.push_back(&", eval(body_name), ")\;", cr)),
         gentran(literal(cr))
     )
-)>>
+)$>>
 }
 
-void <<gentran(literal(eval(filename)))>>System::computeMotion() {
+void <<gentran(literal(eval(filename)))$>>System::computeMotion() {
     // TODO write constant values only once
 <<block([i, i_], 
-    ?ccurrind\*: 4,
+    ccurrind: 4,
     if nbrdep > 0 then gentran(literal("// Dependant variables", cr)),
     for i:1 thru nbrdep do (
         i_: i-1,
         do_assign('p[i_], pi[i]),
         do_assign('pd[i_], pdi[i]),
         do_assign('pdd[i_], pddi[i]),
-        gentran(literal(cr))))>>
+        gentran(literal(cr))))$>>
         
 <<block([i, i_, j, k], 
-    ?ccurrind\*: 4,
+    ccurrind: 4,
     for i:1 thru nbrbody do (
         i_: i-1,
         for j:1 thru 3 do (
@@ -179,10 +179,10 @@ void <<gentran(literal(eval(filename)))>>System::computeMotion() {
         gentran(literal(cr)),
         gentran(literal(cr))
     )
-)>>
+)$>>
 }
 
-void <<gentran(literal(eval(filename)))>>System::computeAppliedEfforts() {
-<<if file_search(user_file)#false then gentranin(user_file)>>
+void <<gentran(literal(eval(filename)))$>>System::computeAppliedEfforts() {
+<<if file_search(user_file)#false then gentranin(user_file)$>>
 }
 
