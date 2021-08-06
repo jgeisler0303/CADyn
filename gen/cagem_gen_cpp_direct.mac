@@ -175,7 +175,7 @@ cagem_gen_cpp_direct(sysdef, [varargs]):= block([i, j, i_, j_, file, title, nbrd
     ),
 
     out_name: concat(filepath, "model_parameters.m"),
-    if file_search(out_name)=true then delete_file(out_name),
+    if file_search(out_name)#false then delete_file(out_name),
     templ_name: ssubst("model_parameters.m.tem", "cagem.mac", cagem_dir),
     gentranin(templ_name, [out_name])
     

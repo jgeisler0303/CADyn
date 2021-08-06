@@ -1,7 +1,7 @@
 <<gentran(literal("%% File generated form template cadyn_acados.m.tem on ", eval(timedate()), ". Do not edit!", cr))$>>
 <<gentran(literal("%% Multibody system: ", eval(title), cr, cr))$>>
 
-function model= <<gentran(literal(eval(filename)))$>>_model()
+function model= <<gentran(literal(eval(filename)))$>>_acados()
 
 import casadi.*
 
@@ -16,21 +16,30 @@ model.name= mfilename;
 stateName= {
 <<block([i], 
     for i:1 thru nbrdof do
-        gentran(literal("    'q", eval(i), "'", cr))
+        if sysdef@sys_rel@default_states=1 then
+            gentran(literal("    'q", eval(i), "'", cr))
+        else
+            gentran(literal("    '", eval(states[i]), "'", cr))
 )$>>};
 makeCasADiNamedVector('q', stateName, model, 1, 1);
 
 dstateName= {
 <<block([i], 
     for i:1 thru nbrdof do
-        gentran(literal("    'qd", eval(i), "'", cr))
+        if sysdef@sys_rel@default_states=1 then
+            gentran(literal("    'qd", eval(i), "'", cr))
+        else
+            gentran(literal("    '", eval(states_d[i]), "'", cr))
 )$>>};
 makeCasADiNamedVector('qd', dstateName, model, 1, 1);
 
 ddstateName= {
 <<block([i], 
     for i:1 thru nbrdof do
-        gentran(literal("    'qdd", eval(i), "'", cr))
+        if sysdef@sys_rel@default_states=1 then
+            gentran(literal("    'qdd", eval(i), "'", cr))
+        else
+            gentran(literal("    '", eval(states_dd[i]), "'", cr))
 )$>>};
 makeCasADiNamedVector('qdd', ddstateName, model, 1, 1);
 

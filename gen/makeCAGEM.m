@@ -1,4 +1,4 @@
-function makeCAGEM(model_path, target_path)
+function makeCAGEM(model_path, target_path, skip_gen)
 maxima_path= getenv('maxima_path');
 if isempty(maxima_path)
     error('Please set path to maxima program via "setenv(''maxima_path'', ''PATH_TO_MAXIMA.EXE'');');
@@ -21,13 +21,15 @@ if ~exist(target_path, 'dir')
     mkdir(target_path);
 end
 
-skip_gen= false;
 code_file= fullfile(target_path, [model_name 'System2.hpp']);
-if exist(code_file, 'file')
-    dd_src= dir(model_path);
-    dd_dst= dir(code_file);
-    if dd_src.datenum<dd_dst.datenum
-        skip_gen= true;
+if ~exist('skip_gen', 'var')
+    skip_gen= false;
+    if exist(code_file, 'file')
+        dd_src= dir(model_path);
+        dd_dst= dir(code_file);
+        if dd_src.datenum<dd_dst.datenum
+            skip_gen= true;
+        end
     end
 end
 
@@ -43,6 +45,8 @@ if ~skip_gen
         'load(\"' strrep(cagem_path, 'cagem.mac', 'cagem_gen_matlab.mac') '\")\$ ', ...
         'writeMATLAB_nonlinear(sys,\"' fullfile(target_path, [model_name '_matlab_nonlin.m']) '\")\$', ...
         'writeMATLAB_linear(sys,\"' fullfile(target_path, [model_name '_matlab_lin.m']) '\")\$', ...
+        'load(\"' strrep(cagem_path, 'cagem.mac', 'cagem_gen_acados.mac') '\")\$ ', ...
+        'cagem_acados(sys,\"' target_path '\")\$', ...
         '"'];
         
     fprintf('%s\n', command_str);

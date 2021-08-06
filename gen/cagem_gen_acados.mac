@@ -44,7 +44,7 @@ cagem_acados(sysdef, [varargs]):= block([i, j, i_, j_, file, title, nbrdof, nbrb
     pre_calc_const: sysdef@const_eqns,
     
     subst_list: [],
-    if sysdef@default_states=1 then (
+    if sysdef@sys_rel@default_states=1 then (
         for i:1 thru nbrdof do
             subst_list: endcons(q[i]=concat(q, i), subst_list),
         for i:1 thru nbrdof do
@@ -70,14 +70,14 @@ cagem_acados(sysdef, [varargs]):= block([i, j, i_, j_, file, title, nbrdof, nbrb
     gentranseg: false,
     clinelen: 1000,
     
-    out_name: sconcat(filepath, filename, "_model.m"),
+    out_name: sconcat(filepath, filename, "_acados.m"),
     if file_search(out_name)#false then delete_file(out_name),
     templ_name: ssubst("cadyn_acados.m.tem", "cagem.mac", cagem_dir),
     gentranin(templ_name, [out_name]),
                                       
-    ext_file: sconcat(filepath, filename, "_external.m"),
+    ext_file: sconcat(filepath, filename, "_acados_external.m"),
     if file_search(ext_file)=false then (
-        ext_file_source: sconcat(pathname_directory(file), filename, "external.m"),
+        ext_file_source: sconcat(pathname_directory(file), filename, "_acados_external.m"),
         
         if not(file_search(ext_file_source)=false) then (
             copy_file(ext_file_source, ext_file)
@@ -93,12 +93,12 @@ cagem_acados(sysdef, [varargs]):= block([i, j, i_, j_, file, title, nbrdof, nbrb
         if file_search(out_name)#false then delete_file(out_name),
         templ_name: ssubst("cadyn_acados_pre_calc.m.tem", "cagem.mac", cagem_dir),
         gentranin(templ_name, [out_name])
-    ),
+    )
     
-    out_name: sconcat(filepath, filename, "model_parameters.m"),
+    /*out_name: sconcat(filepath, filename, "_acados_parameters.m"),
     if file_search(out_name)#false then delete_file(out_name),
     templ_name: ssubst("model_parameters.m.tem", "cagem.mac", cagem_dir),
-    gentranin(templ_name, [out_name])
+    gentranin(templ_name, [out_name])*/
 );
 
 
