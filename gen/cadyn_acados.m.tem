@@ -21,7 +21,7 @@ stateName= {
         else
             gentran(literal("    '", eval(states[i]), "'", cr))
 )$>>};
-makeCasADiNamedVector('q', stateName, model, 1, 1);
+makeCasADiNamedVector('q', stateName, model, 1, 0);
 
 dstateName= {
 <<block([i], 
@@ -31,7 +31,7 @@ dstateName= {
         else
             gentran(literal("    '", eval(states_d[i]), "'", cr))
 )$>>};
-makeCasADiNamedVector('qd', dstateName, model, 1, 1);
+makeCasADiNamedVector('qd', dstateName, model, 1, 0);
 
 ddstateName= {
 <<block([i], 
@@ -41,12 +41,12 @@ ddstateName= {
         else
             gentran(literal("    '", eval(states_dd[i]), "'", cr))
 )$>>};
-makeCasADiNamedVector('qdd', ddstateName, model, 1, 1);
+makeCasADiNamedVector('qdd', ddstateName, model, 1, 0);
 
 sym_x= [q; qd];
 
 dstateName_= strcat('dot', stateName);
-makeCasADiNamedVector('xdot1', dstateName_, model, 1, 1);
+makeCasADiNamedVector('xdot1', dstateName_, model, 1, 0);
 sym_xdot= [xdot1; qdd];
 
 inputName= cell(nu, 1);
@@ -56,10 +56,10 @@ inputName= cell(nu, 1);
             do_assign(concat("inputName{", i, "}"), concat("'", u[i], "'"))
         )
 )$>>
-makeCasADiNamedVector('sym_u', inputName, model, 1, 1);
+makeCasADiNamedVector('sym_u', inputName, model, 1, 0);
 u= sym_u;
 
-makeCasADiNamedVector('sym_z', {}, model, 1, 1);
+makeCasADiNamedVector('sym_z', {}, model, 1, 0);
 
 % Parameters
 paramName= struct();
@@ -78,7 +78,7 @@ paramName= struct();
     for i:1 thru length(pre_calc_const) do
         gentran(literal("paramName.", eval(first(pre_calc_const[i])), "= 1\;", cr))
 )$>>
-makeCasADiNamedVector('sym_p', paramName, model, 1, 1);
+makeCasADiNamedVector('sym_p', paramName, model, 1, 0);
 
 
 % external equations
@@ -87,11 +87,11 @@ externalNames= {
     for i:1 thru length(external) do
         gentran(literal("    '", eval(external[i]), "'", cr))
 )$>>};
-makeCasADiNamedVector('externals', externalNames, model, 1, 1);
+makeCasADiNamedVector('externals', externalNames, model, 1, 0);
         
 <<block([i], 
     if length(external) > 0 then (
-        gentran(literal(eval(filename), "_external\;", cr))
+        gentran(literal(eval(filename), "_acados_external\;", cr))
     )
 )$>>
     

@@ -68,7 +68,7 @@ cagem_acados(sysdef, [varargs]):= block([i, j, i_, j_, file, title, nbrdof, nbrb
     gentranlang: 'c,
     genfloat: true,
     gentranseg: false,
-    clinelen: 1000,
+    clinelen: 10000,
     
     out_name: sconcat(filepath, filename, "_acados.m"),
     if file_search(out_name)#false then delete_file(out_name),
