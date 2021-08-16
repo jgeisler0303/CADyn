@@ -19,7 +19,7 @@ public:
         data(nullptr)
         {}
         
-    ParameterInfo(double *data_, int nrows_, int ncols_, int offset_) :
+    ParameterInfo(real_type *data_, int nrows_, int ncols_, int offset_) :
         isSet(false),
         nrows(nrows_),
         ncols(ncols_),
@@ -27,39 +27,39 @@ public:
         offset(offset_)
         {}
 
-    bool setParam(const double *value);
-    double getParam() const;
-    void getParam(double *p) const;
+    bool setParam(const real_type *value);
+    real_type getParam() const;
+    void getParam(real_type *p) const;
     bool isSet;
     int nrows, ncols;
     int offset;
     
 private:
-    double *data;
+    real_type *data;
 };
 
-bool ParameterInfo::setParam(const double *value) {
+bool ParameterInfo::setParam(const real_type *value) {
     bool wasSet= isSet;
     
-    memcpy(data, value, sizeof(double)*nrows*ncols);
+    memcpy(data, value, sizeof(real_type)*nrows*ncols);
     isSet= true;
     return wasSet;
 }
 
-double ParameterInfo::getParam() const {
+real_type ParameterInfo::getParam() const {
     return data[0];
 }
 
-void ParameterInfo::getParam(double *value) const {
-    memcpy(value, data, sizeof(double)*nrows*ncols);
+void ParameterInfo::getParam(real_type *value) const {
+    memcpy(value, data, sizeof(real_type)*nrows*ncols);
 }
 
 class <<gentran(literal(eval(filename), "Parameters"))$>> {
 public:
     <<gentran(literal(eval(filename), "Parameters"))$>>();
-    void setParam(const std::string &name, const double *value);
-    double getParam(const std::string &name);
-    void getParamArray(double *p);
+    void setParam(const std::string &name, const real_type *value);
+    real_type getParam(const std::string &name);
+    void getParamArray(real_type *p);
     void setFromFile(const std::string &fileName);
     bool unsetParamsWithMsg();
     
@@ -72,9 +72,9 @@ public:
             dims: args(params[i]),
             if length(dims)=1 then dims: endcons(1, dims),
             
-            gentran(literal("    Eigen::Matrix<double, ", eval(dims[1]), ", ", eval(dims[2]), "> ", eval(op(params[i])), "\;", cr))
+            gentran(literal("    Eigen::Matrix<real_type, ", eval(dims[1]), ", ", eval(dims[2]), "> ", eval(op(params[i])), "\;", cr))
         ) else
-            gentran(literal("    double ", eval(params[i]), "\;", cr))
+            gentran(literal("    real_type ", eval(params[i]), "\;", cr))
     )
 )$>>
 };
@@ -95,7 +95,7 @@ public:
     )
 )$>>}
 
-void <<gentran(literal(eval(filename), "Parameters"))$>>::setParam(const std::string &name, const double *value) {
+void <<gentran(literal(eval(filename), "Parameters"))$>>::setParam(const std::string &name, const real_type *value) {
     auto it = info_map.find(name);
     if(it==info_map.end())    
         throw std::runtime_error("Unknown parameter \"" + name + "\".");
@@ -104,7 +104,7 @@ void <<gentran(literal(eval(filename), "Parameters"))$>>::setParam(const std::st
         unsetParams--;
 }
 
-double <<gentran(literal(eval(filename), "Parameters"))$>>::getParam(const std::string &name) {
+real_type <<gentran(literal(eval(filename), "Parameters"))$>>::getParam(const std::string &name) {
     auto it = info_map.find(name);
     if(it==info_map.end())    
         throw std::runtime_error("Unknown parameter \"" + name + "\".");
@@ -131,7 +131,7 @@ void <<gentran(literal(eval(filename), "Parameters"))$>>::setFromFile(const std:
             if(it==info_map.end())    
                 throw std::runtime_error("Unknown parameter \"" + paramName + "\".");
             
-            Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> value(it->second.nrows, it->second.ncols);
+            Eigen::Matrix<real_type,Eigen::Dynamic,Eigen::Dynamic> value(it->second.nrows, it->second.ncols);
             bool fail= false;
             
             for(int r= 0; r<it->second.nrows; ++r) {
@@ -179,7 +179,7 @@ bool <<gentran(literal(eval(filename), "Parameters"))$>>::unsetParamsWithMsg() {
     return unsetParams;
 }
 
-void <<gentran(literal(eval(filename), "Parameters"))$>>::getParamArray(double *p) {
+void <<gentran(literal(eval(filename), "Parameters"))$>>::getParamArray(real_type *p) {
     for(auto const &i : info_map) {
         if(!i.second.isSet)
             throw std::runtime_error("Parameter \"" + i.first + "\" is not set.");

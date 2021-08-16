@@ -21,7 +21,7 @@ if ~exist(target_path, 'dir')
     mkdir(target_path);
 end
 
-code_file= fullfile(target_path, [model_name 'System2.hpp']);
+code_file= fullfile(target_path, [model_name '_direct.hpp']);
 if ~exist('skip_gen', 'var')
     skip_gen= false;
     if exist(code_file, 'file')

@@ -58,7 +58,7 @@ genopt(l):= block([o, temps, replace_list, i],
     
     for i: 1 thru length(temps) do (
         if not(listp(inpart(o, i+1, 2)) or matrixp(inpart(o, i+1, 2))) then (
-            gentran(literal("        double ")),
+            gentran(literal("        real_type ")),
             do_assign(concat(temp, i), subst(pre_replace_list, inpart(o, i+1, 2))),
             replace_list: endcons(pre_replace_list[i], replace_list)
         ) else (
@@ -157,7 +157,7 @@ cagem_gen_cpp_direct(sysdef, [varargs]):= block([i, j, i_, j_, file, title, nbrd
     gentranseg: false,
     clinelen: 1000,
     
-    out_name: sconcat(filepath, filename, "System2.hpp"),
+    out_name: sconcat(filepath, filename, "_direct.hpp"),
     if file_search(out_name)#false then delete_file(out_name),
     templ_name: ssubst("cadyn_direct.cpp.tem", "cagem.mac", cagem_dir),
     gentranin(templ_name, [out_name]),

@@ -1,4 +1,6 @@
-#include "ODEOrder2.hpp"
+<<gentran(literal("\/\* File generated form template cadyn_direct.cpp.tem on ", eval(timedate()), ". Do not edit! \*\/", cr))$>>
+<<gentran(literal("\/\* Multibody system: ", eval(title), " \*\/", cr, cr))$>>
+
 #include <string>
 #include <map>
 #include <fstream>
@@ -8,25 +10,23 @@
 #include <cstdio>
 #include <ctime>
 
-<<gentran(literal("\/\* File generated form template cadyn_direct.cpp.tem on ", eval(timedate()), ". Do not edit! \*\/", cr))$>>
-<<gentran(literal("\/\* Multibody system: ", eval(title), " \*\/", cr, cr))$>>
+#include "NewmarkBeta.hpp"
+
+typedef double real_type;
 
 #include "<<gentran(literal(eval(filename)))$>>_param.hpp"
 
 #define mcond(c, a, x, b) ((c)? a:b)
 
-class <<gentran(literal(eval(filename), "System"))$>>: public ODEOrder2 {
+class <<gentran(literal(eval(filename), "System: public NewmarkBeta<", eval(nbrdof), ", ", eval(nbrin), ", ", eval(length(y)), ", real_type>"))$>> {
 public:
-    static const int nStates= <<gentran(literal(eval(nbrdof)))$>>;
-    static const int nInputs= <<gentran(literal(eval(nbrin)))$>>;
-    static const int nOutputs= <<gentran(literal(eval(length(y))))$>>;
-    static const int nbrdep= <<gentran(literal(eval(nbrdep)))$>>;
+    typedef Eigen::Matrix<real_type, <<gentran(literal(eval(nbrdep)))$>>, 1> VecP;
     
-    <<gentran(literal(eval(filename), "System"))$>>(); 
+    <<gentran(literal(eval(filename), "System"))$>>();
         
     void precalcConsts();
-    virtual VecX computeResiduals();
-    virtual void calcJacobian(double alphaM, double alphaC, double alphaK);
+    virtual VecQ computeResiduals();
+    virtual void calcJacobian(real_type alphaM, real_type alphaC, real_type alphaK);
     virtual void calcB();
     virtual void calcCDF();
     virtual void calcOut();
@@ -40,14 +40,14 @@ public:
     <<gentran(literal(eval(filename), "Parameters"))$>> param;
     
 // private:
-    VecX p, pd, pdd;
+    VecP p, pd, pdd;
 
 <<block([i],
     gentran(literal("    class inputs_t {", cr)),
     gentran(literal("    public:", cr)),
     gentran(literal("        inputs_t(")),
     for i:1 thru nbrin do (
-        gentran(literal("double &", eval(u[i]))),
+        gentran(literal("real_type &", eval(u[i]))),
         if i#nbrin then
             gentran(literal(", "))
     ),            
@@ -59,7 +59,7 @@ public:
     ),            
     gentran(literal(" {}\;", cr, cr)),
     for i:1 thru nbrin do (
-        gentran(literal("        double &", eval(u[i]), "\;", cr))
+        gentran(literal("        real_type &", eval(u[i]), "\;", cr))
     ),            
     gentran(literal("    } inputs\;", cr)),
         
@@ -68,7 +68,7 @@ public:
         gentran(literal("    public:", cr)),
         gentran(literal("        states_t(")),
         for i:1 thru nbrdof do (
-            gentran(literal("double &", eval(states[i]), ", double &", eval(states_d[i]), ", double &", eval(states_dd[i]))),
+            gentran(literal("real_type &", eval(states[i]), ", real_type &", eval(states_d[i]), ", real_type &", eval(states_dd[i]))),
             if i#nbrdof then
                 gentran(literal(", "))
         ),            
@@ -81,9 +81,9 @@ public:
         gentran(literal(" {}\;", cr, cr)),
                               
         for i:1 thru nbrdof do (
-            gentran(literal("        double &", eval(states[i]), "\;", cr)),
-            gentran(literal("        double &", eval(states_d[i]), "\;", cr)),
-            gentran(literal("        double &", eval(states_dd[i]), "\;", cr))
+            gentran(literal("        real_type &", eval(states[i]), "\;", cr)),
+            gentran(literal("        real_type &", eval(states_d[i]), "\;", cr)),
+            gentran(literal("        real_type &", eval(states_dd[i]), "\;", cr))
         ),            
         gentran(literal("    } states\;", cr, cr)),
 
@@ -98,28 +98,22 @@ public:
     
 <<block([i], 
     for i:1 thru length(external) do
-        gentran(literal("    double ", eval(external[i]), "\;", cr)),
+        gentran(literal("    real_type ", eval(external[i]), "\;", cr)),
         
     for i:1 thru length(d_external) do
-        gentran(literal("    double ", eval(d_external[i]), "\;", cr))
+        gentran(literal("    real_type ", eval(d_external[i]), "\;", cr))
 )$>>
 
 <<block([i], 
     for i:1 thru length(pre_calc_const) do
-        gentran(literal("    double ", eval(first(pre_calc_const[i])), "\;", cr))
+        gentran(literal("    real_type ", eval(first(pre_calc_const[i])), "\;", cr))
 )$>>
 };
 
-const int <<gentran(literal(eval(filename)))$>>System::nbrdep;
-
 <<gentran(literal(eval(filename), "System"))$>>::<<gentran(literal(eval(filename), "System"))$>>() : 
-    ODEOrder2(nStates, nInputs, nOutputs, "<<gentran(literal(eval(filename)))$>>", "<<gentran(literal(eval(title)))$>>"),
+    NewmarkBeta("<<gentran(literal(eval(filename)))$>>", "<<gentran(literal(eval(title)))$>>"),
     param(),
-    p(nbrdep),
-    pd(nbrdep),
-    pdd(nbrdep),
 <<block([i],
-    gentran(literal("    // TODO: this is suboptimal because u and q are dynamically allocated and may change location in memory", cr)),
     gentran(literal("    inputs(")),
     for i:1 thru nbrin do (
         gentran(literal("u.data()[", eval(i-1), "]")),
@@ -182,8 +176,8 @@ void <<gentran(literal(eval(filename)))$>>System::precalcConsts() {
 )$>>    
 }
 
-VecX <<gentran(literal(eval(filename)))$>>System::computeResiduals() {
-    VecX f_(nbrdof);
+<<gentran(literal(eval(filename)))$>>System::VecQ <<gentran(literal(eval(filename)))$>>System::computeResiduals() {
+    VecQ f_(nbrdof);
     
 <<block([], 
     if length(external) > 0 then (
@@ -229,7 +223,7 @@ VecX <<gentran(literal(eval(filename)))$>>System::computeResiduals() {
     return f_;
 }
 
-void <<gentran(literal(eval(filename)))$>>System::calcJacobian(double alphaM, double alphaC, double alphaK) {
+void <<gentran(literal(eval(filename)))$>>System::calcJacobian(real_type alphaM, real_type alphaC, real_type alphaK) {
 <<block([], 
     if length(external) > 0 then (
         gentran(literal("    calculateExternalWithDeriv()\;", cr))
