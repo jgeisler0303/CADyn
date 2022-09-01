@@ -36,6 +36,9 @@ end
 mex_file= fullfile(cagem_base, 'gen', mex_cpp);
 
 defines= {['MBSystem=' model_name]};
+if ispc
+    defines{end+1}= '_USE_MATH_DEFINES';
+end
 %  if exist('sfun', 'var') && sfun
 %      defines{end+1}= ['S_FUNCTION_NAME=' mex_name];
 %  end
