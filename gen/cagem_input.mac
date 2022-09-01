@@ -25,13 +25,13 @@ prepareInput(file):= block([
     if WITH_ACCELERATIONS='WITH_ACCELERATIONS then WITH_ACCELERATIONS: 0,
     if WITH_LINEAR#1 then WITH_ACCELERATIONS: 0,
     if INPUTS='INPUTS then INPUTS: [],
+    /* TODO: rename to DOFS */
     if STATES='STATES then STATES: [],
     if STATES_D_PREFIX='STATES_D_PREFIX and STATES_D_POSTFIX='STATES_D_POSTFIX then STATES_D_POSTFIX: _d,
     if STATES_DD_PREFIX='STATES_DD_PREFIX and STATES_DD_POSTFIX='STATES_DD_POSTFIX then STATES_DD_POSTFIX: _dd,
     if EXTERNAL='EXTERNAL then EXTERNAL: [],
     if EXT_PARAM='EXT_PARAM then EXT_PARAM: [],
-    if F_EXT='F_EXT then F_EXT: []
-    else F_EXT: listarray(F_EXT),
+    if F_EXT='F_EXT then F_EXT: [],
     if FinalTime='FinalTime then FinalTime: 10.0,
     if StepSave='StepSave then StepSave: 0.01,
     if StepMax='StepMax then StepMax: 0.01,
@@ -52,13 +52,14 @@ prepareInput(file):= block([
     all_TG0_vars: listofvars([listarray(T0G), listarray(TrefG), listarray(elastic_dof)]),
     for i:1 thru length(STATES) do (
         if not(member(STATES[i], all_TG0_vars)) then
-            error("State ", string(STATES[i]), " is not used in any tranformation matrix")
+            warning("State ", string(STATES[i]), " is not used in any tranformation matrix")
     ),
     
     if not(member(TrefG, arrays)) then TrefG[0]: [],
     if not(member(elastic_dof, arrays)) then elastic_dof[0]: [],
     nbrbody: lmax(append(flatten(rest(arrayinfo(T0G), 2)), flatten(rest(arrayinfo(TrefG), 2)))),
-    nbrdof: length(STATES),
+    /* TODO: make multi body formalism use derivatives of external states */
+    nbrdof: length(STATES)-length(F_EXT),
     nbrz: max(lmax(flatten(map(args, sublist(listofvars([listarray(T0G), listarray(TrefG)]), lambda([x], subvarp(x) and op(x)='z))))), 0),
     for i: 1 thru nbrz do z_list: endcons(z[i], z_list),
     if member('pi, arrays) then nbrdep: lmax(flatten(rest(arrayinfo(pi), 2))) else nbrdep: 0,
@@ -74,7 +75,7 @@ prepareInput(file):= block([
         if member('Ixz, arrays) and member(i, flatten(rest(arrayinfo(Ixz), 2))) then (IG[i][1, 3]: Ixz[i], IG[i][3, 1]: Ixz[i]),
         if member('Iyz, arrays) and member(i, flatten(rest(arrayinfo(Iyz), 2))) then (IG[i][2, 3]: Iyz[i], IG[i][3, 2]: Iyz[i])
     ),
-    for i:1 thru nbrdof do (
+    for i:1 thru length(STATES) do (
         if not(member('qi, arrays)) or not(member(i, flatten(rest(arrayinfo(qi), 2)))) then qi[i]: 0.0,
         if not(member('qdi, arrays)) or not(member(i, flatten(rest(arrayinfo(qdi), 2)))) then qdi[i]: 0.0
     ),
@@ -137,8 +138,8 @@ prepareInput(file):= block([
     sysdef@FinalTime: FinalTime,
     sysdef@StepSave: StepSave,
     sysdef@StepMax: StepMax,
-    sysdef@qi: makelist(qi[i], i, 1, nbrdof),
-    sysdef@qdi: makelist(qdi[i], i, 1, nbrdof),
+    sysdef@qi: makelist(qi[i], i, 1, length(STATES)),
+    sysdef@qdi: makelist(qdi[i], i, 1, length(STATES)),
     sysdef@appliedF: makelist(appliedF[i], i, 1, nbrbody),
     sysdef@appliedM: makelist(appliedM[i], i, 1, nbrbody),
     sysdef@appliedFe: makelist(appliedFe[i], i, 1, nbrbody),
@@ -155,12 +156,12 @@ prepareInput(file):= block([
     sysdef@f_ext: F_EXT,
     
     if default_states=1 then (
-        sysdef@states_d: makelist(qd[i], i, 1, nbrdof),
-        sysdef@states_dd: makelist(qdd[i], i, 1, nbrdof)
+        sysdef@states_d: makelist(qd[i], i, 1, length(STATES)),
+        sysdef@states_dd: makelist(qdd[i], i, 1, length(STATES))
     ) else (
         sysdef@states_d: copy(STATES),
         sysdef@states_dd: copy(STATES),
-        for i:1 thru sysdef@nbrdof do (
+        for i:1 thru length(STATES) do (
             if STATES_D_PREFIX#'STATES_D_PREFIX then
                 sysdef@states_d[i]: concat(STATES_D_PREFIX, sysdef@states_d[i]),
                 

@@ -55,7 +55,7 @@ includes= {
 includes= strcat('-I', includes);
 
 sources= {
-    fullfile(cagem_base, 'src', 'ODEOrder2.cpp')
+%     fullfile(cagem_base, 'src', 'ODEOrder2.cpp')
     };
 
 %  libs= { % order matters!!!
@@ -84,7 +84,7 @@ if ~is_matlab
 end
 
 compiled= false;
-code_file= [model_name 'System2.hpp'];
+code_file= [model_name '_direct.hpp'];
 if exist(mex_name_ext, 'file') && exist(code_file, 'file')
     dd_src= dir(code_file);
     dd_dst= dir(mex_name_ext);

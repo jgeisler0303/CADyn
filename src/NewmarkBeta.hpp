@@ -33,9 +33,9 @@ public:
         NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type> *system;
     };
     
-    static constexpr int nbrdof= nbrdof_;
-    static constexpr int nbrin= nbrin_;
-    static constexpr int nbrout= nbrout_;
+    static const int nbrdof;
+    static const int nbrin;
+    static const int nbrout;
 
     typedef Eigen::Matrix<real_type, nbrdof_, 1> VecQ;
     typedef Eigen::Matrix<real_type, nbrin_, 1> VecI;
@@ -103,8 +103,13 @@ public:
     
     int n_back_steps;
     int n_steps;
+    int n_sub_steps;
     real_type errq;
 };
+
+template <int nbrdof_, int nbrin_, int nbrout_, class real_type> const int NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::nbrdof= nbrdof_;
+template <int nbrdof_, int nbrin_, int nbrout_, class real_type> const int NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::nbrin= nbrin_;
+template <int nbrdof_, int nbrin_, int nbrout_, class real_type> const int NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::nbrout= nbrout_;
 
 template <int nbrdof_, int nbrin_, int nbrout_, class real_type>
 NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::NewmarkBeta(const std::string &aname, const std::string &adesc):
@@ -313,6 +318,7 @@ int NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::newmarkOneStep(real_type h
     real_type err;
     do {
         nstep++;
+        n_sub_steps++;
         if((nstep%jac_recalc_step)==istepjac) {
             calcJacobian(1.0, Gamma*h, Beta*h*h);
             LU.compute(Jacobian);
@@ -327,9 +333,9 @@ int NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::newmarkOneStep(real_type h
         qd-= qdd_corr;
         qdd_corr*= Beta*h/Gamma;
         q-= qdd_corr;
-    } while((nstep<max_steps) && (err>StepTol));
+    } while((nstep<=max_steps) && (err>StepTol));
 
-    if(nstep==max_steps) return 1;
+    if(nstep>max_steps) return 1;
 
     qdd_sto-= qdd;
     errq= 0.0;
@@ -352,6 +358,7 @@ template <int nbrdof_, int nbrin_, int nbrout_, class real_type>
 bool NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::newmarkInterval(real_type tfinal, real_type &h, real_type hmax) {
     bool hchanged= true;
     n_steps= 0;
+    n_sub_steps= 0;
     n_back_steps= 0;
 
     if (h>hmax) h= hmax;
@@ -376,11 +383,12 @@ bool NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::newmarkInterval(real_type
             else
                 h*= sqrt((0.21*AbsTol + 0.04*errq) / errq);
             hchanged= true;
+            
             t= timesto;
-
             q= q_sto;
             qd= qd_sto;
             qdd= qdd_sto;
+            
             if(h<hminmin)
                 return false;
             
@@ -401,11 +409,12 @@ bool NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::newmarkIntervalWithSens(r
     bool hchanged= true;
     bool first_run= true;
     n_steps= 0;
+    n_sub_steps= 0;
     n_back_steps= 0;
     real_type tfinal= t+ts;
     
-    Mat2Q PG_Pddxn_ddxn1();
-    MatS PG_Pxn_dxn_u();
+    Mat2Q PG_Pddxn_ddxn1;
+    MatS PG_Pxn_dxn_u;
     
     newmarkOneStep(0.0);
     

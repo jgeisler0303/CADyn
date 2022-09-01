@@ -16,6 +16,7 @@ public:
         isSet(false),
         nrows(0),
         ncols(0),
+        offset(0),
         data(nullptr)
         {}
         
@@ -23,8 +24,8 @@ public:
         isSet(false),
         nrows(nrows_),
         ncols(ncols_),
-        data(data_),
-        offset(offset_)
+        offset(offset_),
+        data(data_)
         {}
 
     bool setParam(const real_type *value);
