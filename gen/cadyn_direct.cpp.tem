@@ -87,14 +87,15 @@ public:
         ),            
         gentran(literal("    } states\;", cr, cr)),
 
-        gentran(literal(cr, "    const struct {", cr)),
+        gentran(literal(cr, "    typedef struct {", cr)),
                               
         for i:1 thru nbrdof do (
-            gentran(literal("        const int ", eval(states[i]), "= ", eval(i-1), "\;", cr))
+            gentran(literal("        int ", eval(states[i]), "\;", cr))
         ),            
-        gentran(literal("    } states_idx\;", cr))
+        gentran(literal("    } states_idx_type\;", cr))
     )
 )$>>
+    static const states_idx_type states_idx;
     
 <<block([i], 
     for i:1 thru length(external) do
@@ -109,6 +110,8 @@ public:
         gentran(literal("    real_type ", eval(first(pre_calc_const[i])), "\;", cr))
 )$>>
 };
+
+const <<gentran(literal(eval(filename), "System"))$>>::states_idx_type <<gentran(literal(eval(filename), "System"))$>>::states_idx= {<<block([i], for i:1 thru nbrdof do (gentran(literal(eval(i-1))), if i#nbrdof then gentran(literal(", "))))$>>};
 
 <<gentran(literal(eval(filename), "System"))$>>::<<gentran(literal(eval(filename), "System"))$>>() : 
     NewmarkBeta("<<gentran(literal(eval(filename)))$>>", "<<gentran(literal(eval(title)))$>>"),
