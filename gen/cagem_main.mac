@@ -34,27 +34,6 @@ cagem(file, [varargs]):= block([output, i, appliedF, appliedM, appliedFe, T0G, a
     ),
     
     listconstvars: true,
-    output@params: listify(subset(setify(listofvars(output@f)), lambda([x], not(member(x, output@sys_rel@states) or member(x, output@sys_rel@states_d) or member(x, output@sys_rel@states_dd) or member(x, output@sys_rel@u) or member(x, output@sys_rel@external) or member(x, output@sys_rel@d_external) or x=t)))),
-    
-    
-    apply(declare, [output@params, constant]),
-    
-    if length(varargs)>0 then (
-        if varargs[1]=1 then (
-            const_eqns: [],
-                
-            load (rducon),
-            
-            const_prefix: pre_calc_cost,
-            const_counter: 1,
-            
-            if length(output@f)>0 then
-                output@f: reduce_consts(output@f),
-                
-            if length(output@constraints)>0 then
-                output@constraints: reduce_consts(output@constraints)
-        )   
-    ),
     
     if output@sys_rel@WITH_LINEAR=1 then
         output@f_lin: linearize(output@f, output@sys_rel)
@@ -81,7 +60,7 @@ cagem(file, [varargs]):= block([output, i, appliedF, appliedM, appliedFe, T0G, a
         output@f_lin@dpdd_dpdd: []
     ),
     
-        
+    
     if output@sys_rel@WITH_ACCELERATIONS=1 then (
         output@accelerations: calcAccelerations(output@sys_rel@states_dd, output@f, output@f_lin@M),
         if output@sys_abs@SIMPLIFY=1 then
@@ -91,20 +70,34 @@ cagem(file, [varargs]):= block([output, i, appliedF, appliedM, appliedFe, T0G, a
         output@accelerations: []
     ),
     
-    if member('modelOutputs, map(op, functions)) then
-        output@outputs: modelOutputs()
-    else
+    if member('modelOutputs, map(op, functions)) then (
+        output@outputs: modelOutputs(output),
+        output@outputs: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^3=0], output@outputs)))
+    ) else
         output@outputs: [],
+
+    output@params: listify(subset(setify(listofvars([output@f, output@outputs])), lambda([x], not(member(x, output@sys_rel@states) or member(x, output@sys_rel@states_d) or member(x, output@sys_rel@states_dd) or member(x, output@sys_rel@u) or member(x, output@sys_rel@external) or member(x, output@sys_rel@d_external) or x=t)))),
     
+    apply(declare, [output@params, constant]),
+    
+        
     output@const_eqns: [],
+    /* reduce_consts seems to be broken, when constants are squared */
     if length(varargs)>0 then (
         if varargs[1]=1 then (
+            const_eqns: [],
+                
+            load (rducon),
+            
+            const_prefix: pre_calc_const,
+            const_counter: 1,
+            
+            if length(output@f)>0 then
+                output@f: reduce_consts(output@f),
+            
             if length(output@outputs)>0 then
                 output@outputs: reduce_consts(output@outputs),
                 
-            if length(output@accelerations)>0 then
-                output@accelerations: reduce_consts(output@accelerations),
-            
             output@const_eqns: const_eqns
         )
     ),
