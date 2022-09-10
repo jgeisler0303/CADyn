@@ -30,6 +30,10 @@ Tdisp(x,y,z):= block([Toi],
      Toi: matrix([1,0,0,x],[0,1,0,y],[0,0,1,z],[0,0,0,1])
 );
 
+Trot_elast(sys, nbody, nframe):= block(
+    ident(3) + apply("+", makelist(eps*eps_rot*sys@ebody[nbody]@frame[nframe]@ap@M1[i]*sys@states[sys@elastic_dof_idx[nbody][i]], i, 1, length(sys@elastic_dof_idx[nbody])))
+);
+
 Telast(nbody, nframe):= block([Toi, xyz, ori, z_elast],
     z_elast: [concat(z_elast_, nbody, '_, nframe)[1], concat(z_elast_, nbody, '_, nframe)[2], concat(z_elast_, nbody, '_, nframe)[3]],
     xyz: ebody[nbody]@frame[nframe]@origin@M0 + apply("+", makelist(eps*ebody[nbody]@frame[nframe]@origin@M1[i]*elastic_dof[nbody][i], i, 1, length(elastic_dof[nbody]))),
@@ -40,3 +44,25 @@ Telast(nbody, nframe):= block([Toi, xyz, ori, z_elast],
     Toi: Tdisp(z_elast[1], z_elast[2], z_elast[3]) . Tdisp(xyz[1, 1], xyz[2, 1], xyz[3, 1]) . addcol(addrow(ori, [0, 0, 0]), [0, 0, 0, 1])
 );
 
+abs_accel(T_ref, v_ref, a_ref, w_ref, wd_ref, r_rel, v_rel, a_rel):= block([r_abs, v_abs, a_abs], 
+    r_abs: simplify_(submatrix(4, T_ref, 4) . r_rel),
+    v_abs: simplify_(submatrix(4, T_ref, 4) . v_rel),
+    a_abs: simplify_(submatrix(4, T_ref, 4) . a_rel),
+
+    simplify(a_ref + crossmat(wd_ref) . r_abs + crossmat(w_ref) . (crossmat(w_ref) . r_abs) + 2.0*crossmat(w_ref) . v_abs + a_abs)
+);
+
+abs_accel_elast(sys, nbody, nframe):= block([T_ref, v_ref, a_ref, w_ref, ebody, r_rel, v_rel, a_rel, a_abs, ori],
+    T_ref: sys@T0G[nbody],
+    v_ref: sys@vG[nbody],
+    a_ref: sys@aG[nbody],
+    w_ref: sys@omega[nbody],
+    wd_ref: sys@omegad[nbody],
+    ebody: sys@ebody[nbody],
+    
+    r_rel: ebody@frame[nframe]@origin@M0 + apply("+", makelist(eps*ebody@frame[nframe]@origin@M1[i]*sys@states[sys@elastic_dof_idx[nbody][i]], i, 1, length(sys@elastic_dof_idx[nbody]))),
+    v_rel: apply("+", makelist(eps*ebody@frame[nframe]@origin@M1[i]*sys@states_d[sys@elastic_dof_idx[nbody][i]], i, 1, length(sys@elastic_dof_idx[nbody]))),
+    a_rel: apply("+", makelist(eps*ebody@frame[nframe]@origin@M1[i]*sys@states_dd[sys@elastic_dof_idx[nbody][i]], i, 1, length(sys@elastic_dof_idx[nbody]))),
+    
+    a_abs: abs_accel(T_ref, v_ref, a_ref, w_ref, wd_ref, r_rel, v_rel, a_rel)   
+);
