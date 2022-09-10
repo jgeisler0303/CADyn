@@ -35,7 +35,7 @@ cagem_acados(sysdef, [varargs]):= block([i, j, i_, j_, file, title, nbrdof, nbrb
     nbrdep: sysdef@sys_rel@nbrdep,
     nbrin: sysdef@sys_rel@nbrin,
     u: sysdef@sys_rel@u,
-    y: sysdef@outputs, nbrdof, nbrdep,
+    y: sysdef@outputs,
     external: sysdef@sys_rel@external,
     params: append(sysdef@params, sysdef@sys_rel@ext_param),
 
