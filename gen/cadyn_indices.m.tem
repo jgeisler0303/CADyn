@@ -1,0 +1,37 @@
+<<gentran(literal("%% File generated form template cadyn_indices.m.tem on ", eval(timedate()), ". Do not edit!", cr))$>>
+<<gentran(literal("%% Multibody system: ", eval(title), cr, cr))$>>
+
+nx = 2*<<gentran(literal(eval(nbrdof)))$>>;
+nu = <<gentran(literal(eval(nbrin)))$>>;
+ny = <<gentran(literal(eval(nbrout)))$>>;
+
+<<block([i], 
+    for i:1 thru nbrdof do
+        if sysdef@sys_rel@default_states=1 then
+            gentran(literal("q", eval(i), "_idx= ", eval(i), "\;", cr))
+        else
+            gentran(literal(eval(states[i]), "_idx= ", eval(i), "\;", cr))
+)$>>
+
+<<block([i], 
+    for i:1 thru nbrdof do
+        if sysdef@sys_rel@default_states=1 then
+            gentran(literal("q", eval(i), "_d_idx= ", eval(i+nbrdof), "\;", cr))
+        else
+            gentran(literal(eval(states[i]), "_d_idx= ", eval(i+nbrdof), "\;", cr))
+)$>>
+
+<<block([i], 
+        for i:1 thru nbrin do (
+            gentran(literal("in_", eval(inputs[i]), "_idx= ", eval(i), "\;", cr))
+        )
+)$>>
+
+<<block([i], 
+        for i:1 thru nbrout do (
+            if nbrout#length(out_names) then
+                gentran(literal("out_", eval(i), "_idx= ", eval(i), "\;", cr))
+            else
+                gentran(literal("out_", eval(out_names[i]), "_idx= ", eval(i), "\;", cr))
+        )
+)$>>
