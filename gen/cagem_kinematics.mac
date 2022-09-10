@@ -208,8 +208,8 @@ prepareKinematics(sysdef):= block([
                 omegapartial[i,j]: simplify(omegapartial[i,j])
             ),
             for j:1 thru length(sysdef@z_list) do (
-                vGpartial_z[i,j]: simplify(vGpartial_z[i,j]),
-                omegapartial_z[i,j]: simplify(omegapartial_z[i,j])
+                vGpartial_z[i,j]: simplify(subst(zero_z_list, vGpartial_z[i,j])),
+                omegapartial_z[i,j]: simplify(subst(zero_z_list, omegapartial_z[i,j]))
             )
         )
     ),
@@ -226,6 +226,7 @@ prepareKinematics(sysdef):= block([
     totseconds:trunc(ss-mm*60),
     printf(true, "All the operations are finished. Total CPU-time in Maxima: ~d:~6,3,,,,'0h min.~%", mm, totseconds),
     
+    sysdef@T0G: makelist(simplify(T0G[i]), i, 1, sysdef@nbrbody),
     sysdef@vG: makelist(simplify(vG[i]), i, 1, sysdef@nbrbody),
     sysdef@omega: makelist(simplify(omega[i]), i, 1, sysdef@nbrbody),
     sysdef@aG: makelist(simplify(aG[i]), i, 1, sysdef@nbrbody),
