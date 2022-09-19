@@ -22,7 +22,7 @@ bool tryGetOption(double *value, const char *name, const mxArray *mxOptions, int
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     if(nrhs<4 || nrhs>6) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of arguments. Expecting (x0, dx0, u, p, {ts, {options}})"); return; }
     if(nlhs<1 || nlhs>12) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of return values. Expecting [x, {dx, {ddx, {y, {sensitivity, {out_sens, {converged, {cpu_time, {error, {n_steps, {n_back_steps, {n_sub_steps}}}}}}}}}}}]"); return; }
-    if(nrhs==4 && nrhs!=1) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "When four arguments are supplied only the output is calculated and returned as the one and only return value"); return; }
+    if(nrhs==4 && nlhs!=1) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "When four arguments are supplied only the output is calculated and returned as the one and only return value"); return; }
     
     if(!mxIsDouble(prhs[0]) || mxGetNumberOfElements(prhs[0])!=MBSystemClass::nbrdof) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'x0' (%d expected)", MBSystemClass::nbrdof); return; }
     if(!mxIsDouble(prhs[1]) || mxGetNumberOfElements(prhs[1])!=MBSystemClass::nbrdof) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'dx0' (%d expected)", MBSystemClass::nbrdof); return; }

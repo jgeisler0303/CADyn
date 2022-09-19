@@ -280,7 +280,7 @@ bool NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::staticEquilibrium() {
     }
     while((nstep<1000) && (err > (1E-8 * sqrt(1.0*nbrdof_))));
 
-    return(nstep<=1000);
+    return(err < (1E-8 * sqrt(1.0*nbrdof_)));
 }
 
 template <int nbrdof_, int nbrin_, int nbrout_, class real_type>
