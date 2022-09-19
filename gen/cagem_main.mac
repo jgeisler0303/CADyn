@@ -22,6 +22,7 @@ cagem(file, [varargs]):= block([output, i, appliedF, appliedM, appliedFe, T0G, a
     print("Done with generalizedBalance"),
     output@constraints: constraintForces(output@sys_abs, output@forces, [z]),
     print("Done with constraintForces"),
+    
     output@f: subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^3=0], output@f)),
     
     output@f: append(output@f, output@sys_rel@f_ext),
@@ -32,12 +33,14 @@ cagem(file, [varargs]):= block([output, i, appliedF, appliedM, appliedFe, T0G, a
         output@f: simplify(output@f),
         output@constraints: simplify(output@constraints)
     ),
-    
+    print("Done with simplification"),
+
     listconstvars: true,
     
-    if output@sys_rel@WITH_LINEAR=1 then
-        output@f_lin: linearize(output@f, output@sys_rel)
-    else (
+    if output@sys_rel@WITH_LINEAR=1 then (
+        output@f_lin: linearize(output@f, output@sys_rel),
+        print("Done with linearization")
+    ) else (
         output@f_lin: new(lin_model),
         output@f_lin@M: [],
         output@f_lin@E: [],
@@ -65,14 +68,16 @@ cagem(file, [varargs]):= block([output, i, appliedF, appliedM, appliedFe, T0G, a
         output@accelerations: calcAccelerations(output@sys_rel@states_dd, output@f, output@f_lin@M),
         if output@sys_abs@SIMPLIFY=1 then
             output@accelerations: simplify(output@accelerations),
-        accelerations: output@accelerations
+        accelerations: output@accelerations,
+        print("Done with accelerations")
     ) else (
         output@accelerations: []
     ),
     
     if member('modelOutputs, map(op, functions)) then (
         output@outputs: modelOutputs(output),
-        output@outputs: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^3=0], output@outputs)))
+        output@outputs: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^3=0], output@outputs))),
+        print("Done with outputs")
     ) else
         output@outputs: [],
 
