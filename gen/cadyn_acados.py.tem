@@ -1,0 +1,179 @@
+<<gentran(literal("# File generated form template cadyn_acados.py.tem on ", eval(timedate()), ". Do not edit!", cr))$>>
+<<gentran(literal("# Multibody system: ", eval(title), cr, cr))$>>
+
+from acados_template import AcadosModel
+from casadi import *
+
+
+def <<gentran(literal(eval(filename)))$>>_acados():
+
+    # system dimensions
+    nx= 2*<<gentran(literal(eval(nbrdof), cr))$>>
+    nu= <<gentran(literal(eval(nbrin), cr))$>>
+    ny= <<gentran(literal(eval(length(y)), cr))$>>
+
+    # system parameters
+    model = AcadosModel()
+    model.name= '<<gentran(literal(eval(filename)))$>>'
+
+    stateName= [
+<<block([i], 
+    for i:1 thru nbrdof do
+        if sysdef@sys_rel@default_states=1 then
+            gentran(literal("    'q", eval(i), "',", cr))
+        else
+            gentran(literal("    '", eval(states[i]), "',", cr))
+)$>>
+    ]
+    makeCasADiNamedVector('q', stateName)
+
+    dstateName= [
+<<block([i], 
+    for i:1 thru nbrdof do
+        if sysdef@sys_rel@default_states=1 then
+            gentran(literal("    'qd", eval(i), "',", cr))
+        else
+            gentran(literal("    '", eval(states_d[i]), "',", cr))
+)$>>
+    ]
+    makeCasADiNamedVector('qd', dstateName)
+
+    ddstateName= [
+<<block([i], 
+    for i:1 thru nbrdof do
+        if sysdef@sys_rel@default_states=1 then
+            gentran(literal("    'qdd", eval(i), "',", cr))
+        else
+            gentran(literal("    '", eval(states_dd[i]), "',", cr))
+)$>>
+    ]
+    makeCasADiNamedVector('qdd', ddstateName)
+
+    sym_x= vertcat(q, qd)
+
+    dstateName_= ['dot'+sn for sn in stateName]
+    makeCasADiNamedVector('xdot1', dstateName_)
+    sym_xdot= vertcat(xdot1, qdd)
+
+    inputName= [
+<<block([i], 
+    for i:1 thru nbrin do
+            gentran(literal("    '", eval(u[i]), "',", cr))
+)$>>
+    ]
+    makeCasADiNamedVector('sym_u', inputName)
+    u= sym_u
+
+    makeCasADiNamedVector('sym_z', [])
+
+    # Parameters
+    paramName= {
+<<block([i, dims],
+    for i:1 thru length(params) do (
+        if subvarp(params[i]) then (
+            dims: args(params[i]),
+            if length(dims)=1 then dims: endcons(1, dims),
+            
+            gentran(literal("    '", eval(op(params[i])), "': ", eval(dims[1]), "*", eval(dims[2]), ",", cr))
+        ) else
+            gentran(literal("    '", eval(params[i]), "': 1,", cr))
+    )
+)$>>
+<<block([i], 
+    for i:1 thru length(pre_calc_const) do
+        gentran(literal("    '", eval(first(pre_calc_const[i])), "': 1,", cr))
+)$>>
+    }
+    makeCasADiNamedVector('sym_p', paramName)
+
+
+    # external equations
+<<block([i], 
+    if length(external) > 0 then (
+        gentran(literal("    exec(open('", eval(filename), "_acados_external.py').read(), globals())"))
+    )
+)$>>
+    
+
+    # implicit second order model
+<<block([i, i_, opt], 
+    ccurrind: 4,
+
+    opt: genopt([f], f_temp),
+    gentran(literal(cr)),
+
+    for i:1 thru nbrdof do (
+        do_assign(concat('f, i), opt[1][i])
+    ),
+    
+    gentran(literal(cr, "    f= vertcat(")),
+    for i:1 thru nbrdof do (
+        gentran(literal("f", eval(i))),
+        if i<nbrdof then
+            gentran(literal(", "))
+    ),
+    gentran(literal(")", cr))    
+)$>>
+
+
+    # Implicit Nonlinear State-Space Model
+    f_impl_expr = vertcat(xdot1 - qd, f)
+        
+
+    # Outputs
+<<block([opt], 
+    ccurrind: 4,
+    
+    opt: genopt([y], out_temp),
+        
+    for i:1 thru length(y) do (
+        do_assign(concat('sym_y, i), opt[1][i])
+    ),
+    
+    gentran(literal(cr, "    sym_y= vertcat(")),
+    for i:1 thru length(y) do (
+        gentran(literal("sym_y", eval(i))),
+        if i<length(y) then
+            gentran(literal(", "))
+    ),
+    gentran(literal(")", cr))    
+)$>>
+
+    # populate structure
+    model.nx = nx;
+    model.nu = nu;
+    model.u = sym_u;
+    model.x = sym_x;
+    model.xdot = sym_xdot;
+    model.p = sym_p;
+    # model.y = sym_y;
+    model.f_impl_expr = f_impl_expr;
+
+    return model
+
+
+def makeCasADiNamedVector(vec_name, names):
+    uses_sx=False
+    
+    if isinstance(names, dict):
+        s= names
+        names= list(s)
+        sizes= [s[i] for i in s]
+    else:
+        sizes= [1]*len(names)
+
+
+    n= sum(sizes)
+    indices= [sum(sizes[0:x:1]) for x in range(0, len(sizes))]
+
+    if uses_sx:
+        new_syms= SX.sym(vec_name, n)
+    else:
+        new_syms= MX.sym(vec_name, n)
+    
+    globals()[vec_name]= new_syms
+
+    for i in range(len(names)):
+        idx= indices[i]
+        
+        globals()[names[i]]= vertcat(*[new_syms[j] for j in range(idx, sizes[i]+idx)]);
