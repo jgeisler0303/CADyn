@@ -78,6 +78,7 @@ cagem_gen_cpp_direct(sysdef, [varargs]):= block([i, j, i_, j_, file, title, nbrd
     nbrdep: sysdef@sys_rel@nbrdep,
     nbrin: sysdef@sys_rel@nbrin,
     u: sysdef@sys_rel@u,
+    output_names: sysdef@sys_rel@out_names,
     default_states: sysdef@sys_rel@default_states,
     states: sysdef@sys_rel@states,
     states_d: sysdef@sys_rel@states_d,
@@ -167,9 +168,9 @@ cagem_gen_cpp_direct(sysdef, [varargs]):= block([i, j, i_, j_, file, title, nbrd
     templ_name: ssubst("cadyn_direct_params.hpp.tem", "cagem.mac", cagem_dir),
     gentranin(templ_name, [out_name]),
 
-    ext_file: sconcat(filepath, filename, "System_Externals.hpp"),
+    ext_file: sconcat(filepath, filename, "_Externals.hpp"),
     if file_search(ext_file)=false then (
-        ext_file_source: sconcat(pathname_directory(file), filename, "System_Externals.hpp"),
+        ext_file_source: sconcat(pathname_directory(file), filename, "_Externals.hpp"),
         
         if not(file_search(ext_file_source)=false) then (
             copy_file(ext_file_source, ext_file)

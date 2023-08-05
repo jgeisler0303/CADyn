@@ -1,13 +1,13 @@
 
 
-void <<gentran(literal(eval(filename)))$>>System::calculateExternal() {
+void <<gentran(literal(eval(filename)))$>>::calculateExternal() {
 <<block([i], 
         for i:1 thru length(external) do
             gentran(literal("    ", eval(external[i]), "= 0.0\;", cr))
 )$>>
 }
 
-void <<gentran(literal(eval(filename)))$>>System::calculateExternalWithDeriv() {
+void <<gentran(literal(eval(filename)))$>>::calculateExternalWithDeriv() {
 <<block([i], 
     for i:1 thru length(external) do
         gentran(literal("    ", eval(external[i]), "= 0.0\;", cr)),
