@@ -8,16 +8,36 @@
 #ifndef NEWMARKBETA_HPP_
 #define NEWMARKBETA_HPP_
 
+#include <exception>
 #include <iosfwd>
 #include <cmath>
 #include <algorithm>
+#include <fstream>
 #include <sstream>
 #include <vector>
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 
+class NewmarkBetaException: public std::exception {
+public:
+    NewmarkBetaException(const std::string& msg= "General NewmarkBeta integration exception") :
+        m_msg(msg)
+    {  }
+    
+    virtual const char* what() const throw () {
+        return m_msg.c_str();
+    }
+    
+    const std::string m_msg;
+};
 
-template <int nbrdof_, int nbrin_, int nbrout_, class real_type>
+template<typename Derived>
+inline bool is_finite(const Eigen::MatrixBase<Derived>& x)
+{
+	return ( (x - x).array() == (x - x).array()).all();
+}
+
+template <int nbrdof_, int nbrin_, int nbrout_, class real_type_>
 class NewmarkBeta {
 public:
     class AbstractIntegratorVisitor {
@@ -25,18 +45,19 @@ public:
         AbstractIntegratorVisitor(): system(nullptr) {}
         virtual ~AbstractIntegratorVisitor() {}
 
-        void setSystem(NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type> *system_) { system= system_; }
+        void setSystem(NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_> *system_) { system= system_; }
         virtual void start()= 0;
         virtual void step()= 0;
         virtual void finish()= 0;
 
-        NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type> *system;
+        NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_> *system;
     };
     
-    static const int nbrdof;
-    static const int nbrin;
-    static const int nbrout;
+    static constexpr int nbrdof= nbrdof_;
+    static constexpr int nbrin= nbrin_;
+    static constexpr int nbrout= nbrout_;
 
+    typedef real_type_ real_type;
     typedef Eigen::Matrix<real_type, nbrdof_, 1> VecQ;
     typedef Eigen::Matrix<real_type, nbrin_, 1> VecI;
     typedef Eigen::Matrix<real_type, nbrout_, 1> VecO; 
@@ -58,13 +79,15 @@ public:
     virtual void calcB();
     virtual void calcCDF();
     virtual void calcOut()= 0;
-    bool staticEquilibrium();
-    bool staticEquilibriumWithLin();
+    void staticEquilibrium();
+    void staticEquilibriumWithLin();
     int newmarkOneStep(real_type h, bool hmodified= true);
-    bool newmarkInterval(real_type tfinal, real_type &h, real_type hmax);
-    bool newmarkIntervalWithSens(real_type ts) { return newmarkIntervalWithSens(ts, ts); };
-    bool newmarkIntervalWithSens(real_type ts, real_type h);
-    bool newmarkIntegration(real_type tfinal, real_type hsave, real_type hmax, AbstractIntegratorVisitor *visitor= nullptr);
+    void newmarkInterval(real_type tfinal, real_type &h, real_type hmax);
+    void newmarkIntervalWithSens(real_type ts) { return newmarkIntervalWithSens(ts, ts); };
+    void newmarkIntervalWithSens(real_type ts, real_type h);
+    void newmarkIntervalWithSens_restart(real_type ts) { return newmarkIntervalWithSens_restart(ts, ts); };
+    void newmarkIntervalWithSens_restart(real_type ts, real_type h);
+    void newmarkIntegration(real_type tfinal, real_type hsave, real_type hmax, AbstractIntegratorVisitor *visitor= nullptr);
     void setOptionsFromFile(const std::string &fileName);
 
     std::string name;
@@ -107,12 +130,12 @@ public:
     real_type errq;
 };
 
-template <int nbrdof_, int nbrin_, int nbrout_, class real_type> const int NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::nbrdof= nbrdof_;
-template <int nbrdof_, int nbrin_, int nbrout_, class real_type> const int NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::nbrin= nbrin_;
-template <int nbrdof_, int nbrin_, int nbrout_, class real_type> const int NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::nbrout= nbrout_;
+// template <int nbrdof_, int nbrin_, int nbrout_, class real_type_> const int NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_>::nbrdof= nbrdof_;
+// template <int nbrdof_, int nbrin_, int nbrout_, class real_type_> const int NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_>::nbrin= nbrin_;
+// template <int nbrdof_, int nbrin_, int nbrout_, class real_type_> const int NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_>::nbrout= nbrout_;
 
-template <int nbrdof_, int nbrin_, int nbrout_, class real_type>
-NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::NewmarkBeta(const std::string &aname, const std::string &adesc):
+template <int nbrdof_, int nbrin_, int nbrout_, class real_type_>
+NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_>::NewmarkBeta(const std::string &aname, const std::string &adesc):
         name(aname),
         description(adesc)
     {
@@ -133,8 +156,8 @@ NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::NewmarkBeta(const std::string 
         }
     }
 
-template <int nbrdof_, int nbrin_, int nbrout_, class real_type>
-void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::writeStateVariablesHeader(std::ostream &OutFile) {
+template <int nbrdof_, int nbrin_, int nbrout_, class real_type_>
+void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_>::writeStateVariablesHeader(std::ostream &OutFile) {
     OutFile << " time ";
 
     for(int idof= 0; idof < nbrdof_; idof++)
@@ -146,8 +169,8 @@ void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::writeStateVariablesHeader
     OutFile << std::endl;
 }
 
-template <int nbrdof_, int nbrin_, int nbrout_, class real_type>
-void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::writeStateVariables(std::ostream &OutFile) {
+template <int nbrdof_, int nbrin_, int nbrout_, class real_type_>
+void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_>::writeStateVariables(std::ostream &OutFile) {
     OutFile << " " << t;
 
     for(int idof= 0;idof < nbrdof_; idof++)
@@ -159,8 +182,8 @@ void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::writeStateVariables(std::
     OutFile << std::endl;
 }
 
-template <int nbrdof_, int nbrin_, int nbrout_, class real_type>
-typename NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::VecQ NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::computeResidualsInt() {
+template <int nbrdof_, int nbrin_, int nbrout_, class real_type_>
+typename NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_>::VecQ NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_>::computeResidualsInt() {
     VecQ f= computeResiduals();
     for(int idof= 0; idof < nbrdof_; idof++)
         if(doflocked[idof]) f[idof]= 0.0;
@@ -168,8 +191,8 @@ typename NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::VecQ NewmarkBeta<nbrd
     return f;
 }
 
-template <int nbrdof_, int nbrin_, int nbrout_, class real_type>
-void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::calcJacobian(real_type alphaM, real_type alphaC, real_type alphaK) {
+template <int nbrdof_, int nbrin_, int nbrout_, class real_type_>
+void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_>::calcJacobian(real_type alphaM, real_type alphaC, real_type alphaK) {
     VecQ foff;
     f= computeResidualsInt();
 
@@ -194,8 +217,8 @@ void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::calcJacobian(real_type al
     }
 }
 
-template <int nbrdof_, int nbrin_, int nbrout_, class real_type>
-void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::calcB() {
+template <int nbrdof_, int nbrin_, int nbrout_, class real_type_>
+void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_>::calcB() {
     VecQ foff;
     f= computeResidualsInt();
     
@@ -211,8 +234,8 @@ void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::calcB() {
     }
 }
 
-template <int nbrdof_, int nbrin_, int nbrout_, class real_type>
-void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::calcCDF() {
+template <int nbrdof_, int nbrin_, int nbrout_, class real_type_>
+void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_>::calcCDF() {
     calcOut();
     VecO y_base= y;
     
@@ -261,9 +284,12 @@ void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::calcCDF() {
     y= y_base;
 }
 
-template <int nbrdof_, int nbrin_, int nbrout_, class real_type>
-bool NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::staticEquilibrium() {
+template <int nbrdof_, int nbrin_, int nbrout_, class real_type_>
+void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_>::staticEquilibrium() {
     real_type err;
+    
+    if(!is_finite(q) || !is_finite(qd) || !is_finite(qdd) || !is_finite(u))
+        throw NewmarkBetaException("Static equilibrium calculation: initial values of q, qd, qdd, u are not finite.");
 
     int nstep= 0;
     do {
@@ -275,37 +301,38 @@ bool NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::staticEquilibrium() {
             f= computeResidualsInt();
 
         VecQ qdd_corr= LU.solve(f);
+
+        if(!is_finite(qdd_corr))
+            throw NewmarkBetaException("Static equilibrium calculation: Newton step is not finite.");
+            
         q-= qdd_corr;
         err= qdd_corr.norm();
     }
     while((nstep<1000) && (err > (1E-8 * sqrt(1.0*nbrdof_))));
 
-    return(err < (1E-8 * sqrt(1.0*nbrdof_)));
+    if(err > (1E-8 * sqrt(1.0*nbrdof_)))
+        throw NewmarkBetaException("Static equilibrium calculation: tolerance not reached after 1000 iterations.");
+    
 }
 
-template <int nbrdof_, int nbrin_, int nbrout_, class real_type>
-bool NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::staticEquilibriumWithLin() {
-    bool res= staticEquilibrium();
+template <int nbrdof_, int nbrin_, int nbrout_, class real_type_>
+void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_>::staticEquilibriumWithLin() {
+    staticEquilibrium();
     calcJacobian(0.0, 0.0, 0.0);
     calcB();
     
-    // MatX Pxn1_Pxn
+    // return continuous time linearization
     S.block(0, 0, nbrdof_, nbrdof_)= M;
-    // MatX Pxn1_Pdxn
     S.block(0, nbrdof_, nbrdof_, nbrdof_)= MatQ::Identity();
-    // MatX Pdxn1_Pxn
     S.block(nbrdof_, 0, nbrdof_, nbrdof_)= -C;
-    // MatX Pdxn1_Pdxn
     S.block(nbrdof_, nbrdof_, nbrdof_, nbrdof_)= -K;
     
     S.block(0, 2*nbrdof_, nbrdof_, nbrin_).setZero();
     S.block(nbrdof_, 2*nbrdof_, nbrdof_, nbrin_)= -B;
-    
-    return res;
 }    
     
-template <int nbrdof_, int nbrin_, int nbrout_, class real_type>
-int NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::newmarkOneStep(real_type h, bool hmodified) {
+template <int nbrdof_, int nbrin_, int nbrout_, class real_type_>
+int NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_>::newmarkOneStep(real_type h, bool hmodified) {
     VecQ qdd_sto= qdd;
     t+= h;
     q+= h*qd + 0.5*h*h*qdd;
@@ -326,6 +353,10 @@ int NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::newmarkOneStep(real_type h
             f= computeResidualsInt();
 
         VecQ qdd_corr= LU.solve(f);
+        
+        if(!is_finite(qdd_corr))
+            throw NewmarkBetaException("Step calculation: Newton step is not finite.");
+        
         err= qdd_corr.norm() / (sqrt(1.0*nbrdof_) * (1.0 + qdd.norm()));
 
         qdd-= qdd_corr;
@@ -354,13 +385,16 @@ int NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::newmarkOneStep(real_type h
     return 0;
 }
 
-template <int nbrdof_, int nbrin_, int nbrout_, class real_type>
-bool NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::newmarkInterval(real_type tfinal, real_type &h, real_type hmax) {
+template <int nbrdof_, int nbrin_, int nbrout_, class real_type_>
+void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_>::newmarkInterval(real_type tfinal, real_type &h, real_type hmax) {
     bool hchanged= true;
     n_steps= 0;
     n_sub_steps= 0;
     n_back_steps= 0;
 
+    if(!is_finite(q) || !is_finite(qd) || !is_finite(qdd) || !is_finite(u))
+        throw NewmarkBetaException("Interval calculation: initial values of q, qd, qdd, u are not finite.");
+    
     if (h>hmax) h= hmax;
     while(t < tfinal) {
         if((t+1.4*h) >= tfinal) {
@@ -390,7 +424,7 @@ bool NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::newmarkInterval(real_type
             qdd= qdd_sto;
             
             if(h<hminmin)
-                return false;
+                throw NewmarkBetaException("Interval calculation: dynamic step size too small.");
             
             n_back_steps++;
         } else {
@@ -401,11 +435,10 @@ bool NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::newmarkInterval(real_type
             }
         }
     }
-    return true;
 }
 
 template <int nbrdof_, int nbrin_, int nbrout_, class real_type>
-bool NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::newmarkIntervalWithSens(real_type ts, real_type h) {
+void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::newmarkIntervalWithSens_restart(real_type ts, real_type h) {
     bool hchanged= true;
     bool first_run= true;
     n_steps= 0;
@@ -415,6 +448,9 @@ bool NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::newmarkIntervalWithSens(r
     
     Mat2Q PG_Pddxn_ddxn1;
     MatS PG_Pxn_dxn_u;
+    
+    if(!is_finite(q) || !is_finite(qd) || !is_finite(qdd) || !is_finite(u))
+        throw NewmarkBetaException("Interval calculation: initial values of q, qd, qdd, u are not finite.");
     
     newmarkOneStep(0.0);
     
@@ -458,7 +494,7 @@ bool NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::newmarkIntervalWithSens(r
             qd= qd_sto;
             qdd= qdd_sto;
             if(h<hminmin)
-                return false;
+                throw NewmarkBetaException("Interval calculation: dynamic step size too small.");
             
             n_back_steps++;
         } else {
@@ -508,14 +544,53 @@ bool NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::newmarkIntervalWithSens(r
     CD.block(0, 0, nbrout_, nbrdof_)+= F*Pddxn1_Pxn; // TODO: really ddxn_1_ ?
     CD.block(0, nbrdof_, nbrout_, nbrdof_)+= F*Pddxn1_Pdxn;
     CD.block(0, 2*nbrdof_, nbrout_, nbrin_)+= F*Pddxn1_Pu;
-    
-    return true;
 }
 
-template <int nbrdof_, int nbrin_, int nbrout_, class real_type>
-bool NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::newmarkIntegration(real_type tfinal, real_type hsave, real_type hmax, AbstractIntegratorVisitor *visitor) {
+template <int nbrdof_, int nbrin_, int nbrout_, class real_type_>
+void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_>::newmarkIntervalWithSens(real_type ts, real_type h) {
+    newmarkInterval(t+ts, h, ts);
+    
+    // calculate pfk1_pqdd, pfk1_pqd, pfk1_pq (M, C, K), does not work with base class
+    // TODO: maybe reuse Jacobian for next step or from last
+    calcJacobian(1.0, Gamma*h, Beta*h*h);
+    calcB();
+    calcCDF();
+    
+    MatQ pfk1_pqdk= C + ts*K;
+    
+    // pfk1_pqddk1= Jacobian
+    LU.compute(Jacobian);
+    
+    MatQ pqddk1_pqk= -LU.solve(K);
+    MatQ pqddk1_pqdk= -LU.solve(pfk1_pqdk);
+    MatQI pqddk1_puk= -LU.solve(B);
+    
+    // pqk1_pqk
+    S.block(0, 0, nbrdof_, nbrdof_)= MatQ::Identity() + ts*ts*Beta*pqddk1_pqk;
+    // pqk1_pqdk
+    S.block(0, nbrdof_, nbrdof_, nbrdof_)= ts*MatQ::Identity() + ts*ts*Beta*pqddk1_pqdk;
+    // pqdk1_pqk
+    S.block(nbrdof_, 0, nbrdof_, nbrdof_)= ts*Gamma*pqddk1_pqk;
+    // pqdk1_pqdk
+    S.block(nbrdof_, nbrdof_, nbrdof_, nbrdof_)= MatQ::Identity() + ts*Gamma*pqddk1_pqdk;
+
+    // pqk1_puk
+    S.block(0, 2*nbrdof_, nbrdof_, nbrin_)= ts*ts*Beta*pqddk1_puk;
+    // pqdk1_puk
+    S.block(nbrdof_, 2*nbrdof_, nbrdof_, nbrin_)= ts*Gamma*pqddk1_puk;
+    
+    CD.block(0, 0, nbrout_, nbrdof_)+= F*pqddk1_pqk;
+    CD.block(0, nbrdof_, nbrout_, nbrdof_)+= F*pqddk1_pqdk;
+    CD.block(0, 2*nbrdof_, nbrout_, nbrin_)+= F*pqddk1_puk;
+}
+
+template <int nbrdof_, int nbrin_, int nbrout_, class real_type_>
+void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_>::newmarkIntegration(real_type tfinal, real_type hsave, real_type hmax, AbstractIntegratorVisitor *visitor) {
     t= 0.0;
     real_type h= 0.0;
+
+    if(!is_finite(q) || !is_finite(qd) || !is_finite(qdd) || !is_finite(u))
+        throw NewmarkBetaException("Integrator: initial values of q, qd, qdd, u are not finite.");
 
     if(visitor) {
         visitor->setSystem(this);
@@ -530,19 +605,16 @@ bool NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::newmarkIntegration(real_t
     h= hmax;
     while(t<tfinal)    {
         ipas++;
-        if(!newmarkInterval(hsave*ipas, h, hmax)) {
-            res= false;
-            break;
-        }
+        newmarkInterval(hsave*ipas, h, hmax);
+        
         if(visitor) visitor->step();
     }
 
     if(visitor) visitor->finish();
-    return res;
 }
 
-template <int nbrdof_, int nbrin_, int nbrout_, class real_type>
-void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::setOptionsFromFile(const std::string &fileName) {
+template <int nbrdof_, int nbrin_, int nbrout_, class real_type_>
+void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_>::setOptionsFromFile(const std::string &fileName) {
     std::ifstream infile(fileName);
     real_type value;
     
