@@ -1,6 +1,6 @@
-function makeMex(model_name, target_path, mex_cpp, mex_name)
+function makeCADynMex(model_name, target_path, mex_cpp, mex_name, add_includes)
 
-if ~exist('mex_cpp', 'var')
+if ~exist('mex_cpp', 'var') || isempty(mex_cpp)
     mex_cpp= 'CADyn_mex.cpp';
 end
 
@@ -17,7 +17,7 @@ cleanupObj = onCleanup(@()cd(start_dir));
 
 cd(target_path);
 
-if ~exist('mex_name', 'var')
+if ~exist('mex_name', 'var') || isempty(mex_name)
     mex_name= [model_name '_mex'];
 end
 
@@ -33,7 +33,7 @@ else
 end
 
 
-mex_file= fullfile(cagem_base, 'gen', mex_cpp);
+mex_file= fullfile(cagem_base, 'src', mex_cpp);
 
 defines= {['MBSystem=' model_name]};
 if ispc
@@ -51,10 +51,15 @@ if is_matlab
 end
     
 includes= {
-    '.'
+    '.', ...
     fullfile(cagem_base, 'src')
     };
-
+if exist('add_includes', 'var')
+    if ~iscell(add_includes)
+        add_includes= {add_includes};
+    end
+    includes= [includes add_includes];
+end
 includes= strcat('-I', includes);
 
 sources= {
@@ -99,10 +104,10 @@ if ~compiled
     error('Mex was not properly compiled');
 end
 
-try
-    movefile(mex_name_ext, start_dir);
-catch e
-    if ~strcmp(e.identifier, 'MATLAB:MOVEFILE:SourceAndDestinationSame')
-        rethrow(e);
-    end
-end
+% try
+%     movefile(mex_name_ext, start_dir);
+% catch e
+%     if ~strcmp(e.identifier, 'MATLAB:MOVEFILE:SourceAndDestinationSame')
+%         rethrow(e);
+%     end
+% end

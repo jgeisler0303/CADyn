@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define makeMBSystemClass(c) c ## System
+#define makeMBSystemClass(c) c
 #define exp_makeMBSystemClass(c) makeMBSystemClass(c)
 #define MBSystemClass exp_makeMBSystemClass(MBSystem)
 
@@ -26,7 +26,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     
     if(!mxIsDouble(prhs[0]) || mxGetNumberOfElements(prhs[0])!=MBSystemClass::nbrdof) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'x0' (%d expected)", MBSystemClass::nbrdof); return; }
     if(!mxIsDouble(prhs[1]) || mxGetNumberOfElements(prhs[1])!=MBSystemClass::nbrdof) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'dx0' (%d expected)", MBSystemClass::nbrdof); return; }
-    // TODO: enable more than on sim step
+    // TODO: enable more than one sim step
     if(!mxIsDouble(prhs[2]) || mxGetNumberOfElements(prhs[2])!=MBSystemClass::nbrin) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'u' (%d expected)", MBSystemClass::nbrin); return; }
     
     if(nrhs>=5)
@@ -121,11 +121,16 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     
     std::clock_t startcputime = std::clock();
     
-    bool res;
-    if(ts==0.0)
-        res= system.staticEquilibriumWithLin();
-    else
-        res= system.newmarkIntervalWithSens(ts);
+    bool res= true;
+    try {
+        if(ts==0.0)
+            system.staticEquilibriumWithLin();
+        else
+            system.newmarkIntervalWithSens_restart(ts);
+    } catch (const std::exception& e) {
+        mexWarnMsgIdAndTxt("CADyn:Integrator", "CADyn Error: %s", e.what());
+        res= false;
+    }
     
     double cpu_duration = (std::clock() - startcputime) / (double)CLOCKS_PER_SEC;
     
