@@ -226,8 +226,9 @@ evalModalTaylor(t, edof_idx, states, eps):= block([r, i, j],
             if t@nelem>0 then (
                 for j: 1 thru t@nelem do
                     r[j]: r[j] + t@M1[i][j]*states[edof_idx[i]]*eps /* eps? */
-            ) else
-                r: r + t@M1[i]*states[edof_idx[i]]*eps, /* eps? */
+            ) else (
+                r: r + t@M1[i]*states[edof_idx[i]]*eps /* eps? */
+            ),
             
     r
 );
