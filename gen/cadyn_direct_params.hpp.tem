@@ -10,6 +10,28 @@
 <<gentran(literal("\/\* File generated form template cadyn_direct_params.hpp.tem on ", eval(timedate()), ". Do not edit! \*\/", cr))$>>
 <<gentran(literal("\/\* Multibody system: ", eval(title), " \*\/", cr, cr))$>>
 
+#ifdef WITH_CONSTANTS
+<<block([i, j],
+    gentran(literal("const int n_states= ", eval(nbrdof*2), "\;", cr)),
+    gentran(literal("const int n_inputs= ", eval(nbrin), "\;", cr, cr)),
+
+    j: 0,
+    for i:1 thru nbrdof do (
+        gentran(literal("const int ", eval(states[i]), "= ", eval(j), "\;", cr)),
+        j: j+1
+    ),            
+    for i:1 thru nbrdof do (
+        gentran(literal("const int ", eval(states_d[i]), "= ", eval(j), "\;", cr)),
+        j: j+1
+    ),            
+    j: 0,
+    for i:1 thru nbrin do (
+        gentran(literal("const int ", eval(u[i]), "= ", eval(j), "\;", cr)),
+        j: j+1
+    )
+)$>>
+#endif
+
 class ParameterInfo {
 public:
     ParameterInfo() :
@@ -61,6 +83,7 @@ public:
     void setParam(const std::string &name, const real_type *value);
     real_type getParam(const std::string &name);
     void getParamArray(real_type *p);
+    int getNumParameters();
     void setFromFile(const std::string &fileName);
     bool unsetParamsWithMsg();
     
@@ -187,4 +210,12 @@ void <<gentran(literal(eval(filename), "Parameters"))$>>::getParamArray(real_typ
         
         i.second.getParam(&p[i.second.offset]);
     }    
+}
+
+int <<gentran(literal(eval(filename), "Parameters"))$>>::getNumParameters() {
+    int num= 0;
+    for(auto const &i : info_map) {
+        num+= i.second.nrows * i.second.ncols;
+    }
+    return num;
 }

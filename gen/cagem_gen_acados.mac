@@ -27,13 +27,16 @@ genopt(l, temp_name):= block([o, temps, replace_list, i],
 );
 
 
-cagem_acados(sysdef, [varargs]):= block([i, j, i_, j_, file, title, nbrdof, nbrbody, nbrin, nbrdep, external, params, f],
+cagem_gen_acados(sysdef, [varargs]):= block([i, j, i_, j_, file, title, nbrdof, nbrbody, nbrin, nbrdep, external, params, f],
     file: sysdef@sys_rel@file,
     title: sysdef@sys_rel@name,
     nbrdof: sysdef@sys_rel@nbrdof,
     nbrbody: sysdef@sys_rel@nbrbody,
     nbrdep: sysdef@sys_rel@nbrdep,
     nbrin: sysdef@sys_rel@nbrin,
+    states: sysdef@sys_rel@states,
+    inputs: sysdef@sys_rel@u,
+    out_names: sysdef@sys_rel@out_names,
     u: sysdef@sys_rel@u,
     y: sysdef@outputs,
     external: sysdef@sys_rel@external,

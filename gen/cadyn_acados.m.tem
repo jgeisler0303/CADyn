@@ -29,7 +29,7 @@ dstateName= {
         if sysdef@sys_rel@default_states=1 then
             gentran(literal("    'qd", eval(i), "'", cr))
         else
-            gentran(literal("    '", eval(states_d[i]), "'", cr))
+            gentran(literal("    '", eval(states[i]), "_d'", cr))
 )$>>};
 makeCasADiNamedVector('qd', dstateName, model, 1, 0);
 
@@ -39,7 +39,7 @@ ddstateName= {
         if sysdef@sys_rel@default_states=1 then
             gentran(literal("    'qdd", eval(i), "'", cr))
         else
-            gentran(literal("    '", eval(states_dd[i]), "'", cr))
+            gentran(literal("    '", eval(states[i]), "_dd'", cr))
 )$>>};
 makeCasADiNamedVector('qdd', ddstateName, model, 1, 0);
 
