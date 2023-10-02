@@ -77,6 +77,7 @@ cagem_gen_cpp_direct(sysdef, [varargs]):= block([i, j, i_, j_, file, title, nbrd
     nbrbody: sysdef@sys_rel@nbrbody,
     nbrdep: sysdef@sys_rel@nbrdep,
     nbrin: sysdef@sys_rel@nbrin,
+    nbrout: length(sysdef@outputs),
     u: sysdef@sys_rel@u,
     output_names: sysdef@sys_rel@out_names,
     default_states: sysdef@sys_rel@default_states,

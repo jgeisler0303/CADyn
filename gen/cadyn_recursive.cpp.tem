@@ -1,118 +1,211 @@
-#include "MBSystem.hpp"
-#include "Body.hpp"
-#include "ElasticBody.hpp"
+// TODO: handle f_ext, add constraints
 
 <<gentran(literal("\/\* File generated form template cadyn_recursive.cpp.tem on ", eval(timedate()), ". Do not edit! \*\/", cr))$>>
 <<gentran(literal("\/\* Multibody system: ", eval(title), " \*\/", cr, cr))$>>
 
-class <<gentran(literal(eval(filename), "System"))$>>: public MBSystem {
-public:
-    static const int nStates= <<gentran(literal(eval(nbrdof)))$>>;
-    static const int nInputs= <<gentran(literal(eval(nbrin)))$>>;
-    
-    <<gentran(literal(eval(filename), "System"))$>>(); 
-    virtual void computeMotion();
-    virtual void computeAppliedEfforts();
-};
+#include <string>
+#include <map>
+#include <fstream>
+#include <iostream>
+#include <stdlib.h>
+#include <chrono>
+#include <cstdio>
+#include <ctime>
+#include <duals/dual_eigen>
 
-<<gentran(literal(eval(filename), "System::",eval(filename), "System"))$>>(): 
-    MBSystem(<<gentran(literal(eval(nbrbody)))$>>, nStates, <<gentran(literal(eval(nbrdep)))$>>, nInputs, "<<gentran(literal(eval(filename)))$>>", "<<gentran(literal(eval(title)))$>>") {
-        
-<<block(
-    ccurrind: 4,
-    gentran(literal("    g << ", eval(float(gravity[1])), ", ", eval(float(gravity[2])), ", ", eval(float(gravity[3])), "\;", cr))
-    )$>>
+#include "NewmarkBeta.hpp"
+#include "MultiBody.hpp"
+
+typedef double real_type;
+
+
+#include "<<gentran(literal(eval(filename)))$>>_recursive_param.hpp"
+
+#define mcond(c, a, x, b) ((c)? a:b)
+
+template<typename scalar_type>
+using VecPn= Eigen::Matrix<scalar_type, <<gentran(literal(eval(nbrdep)))$>>, 1>;
+
+template<typename scalar_type>
+using VecQn= VecQ<scalar_type, <<gentran(literal(eval(nbrdof)))$>>>;
+
+template<typename scalar_type>
+using VecUn= Eigen::Matrix<scalar_type, <<gentran(literal(eval(nbrin)))$>>, 1>;
+
+template<typename scalar_type>
+using VecYn= Eigen::Matrix<scalar_type, <<gentran(literal(eval(nbrout)))$>>, 1>;
+
+
+template<typename scalar_type, typename real_type>
+class MultiBodySystemODE {
+public:
+    MultiBodySystemODE(<<gentran(literal(eval(filename), "Parameters"))$>> &param);
+    VecQn<scalar_type> computeResiduals(const VecQn<scalar_type> &q, const VecQn<scalar_type> &qd, const VecQn<scalar_type> &qdd, const VecUn<scalar_type> &u);
+    VecYn<scalar_type> calcOut(const VecQn<scalar_type> &q, const VecQn<scalar_type> &qd, const VecQn<scalar_type> &qdd, const VecUn<scalar_type> &u);
+
+<<block([], 
+    if length(external) > 0 then (
+        gentran(literal("    void calculateForces(const VecQn<scalar_type> &q, const VecQn<scalar_type> &qd, const VecQn<scalar_type> &qdd, const VecUn<scalar_type> &u)\;", cr))
+    )
+)$>>
+    
+    <<gentran(literal(eval(filename), "Parameters"))$>> &param;
+
+    VecPn<scalar_type> p, pd, pdd;
+    Eigen::Matrix<real_type, 3, 1> g;
     
 <<block([i, i_, j, k], 
     ccurrind: 4,
     for i:1 thru nbrbody do (
         if length(elastic_dof_idx[i])>0 then (
             body_name: concat("ebody", i),
-            gentran(literal("    ElasticBody &", eval(body_name), "= *(new ElasticBody(", eval(nbrdof), ", ", eval(length(elastic_dof_idx[i])),"))\;", cr)),
-            do_assign(concat(body_name, ".", 'mass), ebody[i]@refmod@mass),
-            do_assign(concat(body_name, ".", "PhiG(0, 0)"), ebody[i]@I@M0[1,1]),
-            do_assign(concat(body_name, ".", "PhiG(1, 1)"), ebody[i]@I@M0[2,2]),
-            do_assign(concat(body_name, ".", "PhiG(2, 2)"), ebody[i]@I@M0[3,3]),
-            do_assign(concat(body_name, ".", "PhiG(0, 1)"), ebody[i]@I@M0[1,2]),
-            do_assign(concat(body_name, ".", "PhiG(1, 0)"), ebody[i]@I@M0[1,2]),
-            do_assign(concat(body_name, ".", "PhiG(0, 2)"), ebody[i]@I@M0[1,3]),
-            do_assign(concat(body_name, ".", "PhiG(2, 0)"), ebody[i]@I@M0[1,3]),
-            do_assign(concat(body_name, ".", "PhiG(1, 2)"), ebody[i]@I@M0[2,3]),
-            do_assign(concat(body_name, ".", "PhiG(2, 1)"), ebody[i]@I@M0[2,3])
+            gentran(literal("    ElasticBody<scalar_type, real_type, ", eval(nbrdof), ", ", eval(length(elastic_dof_idx[i])), "> ", eval(body_name), "\;", cr))
         ) else (
             body_name: concat("body", i),
-            gentran(literal("    Body &", eval(body_name), "= *(new Body(", eval(nbrdof), "))\;", cr)),
-            do_assign(concat(body_name, ".", 'mass), mass[i]),
-            do_assign(concat(body_name, ".", "PhiG(0, 0)"), IG[i][1,1]),
-            do_assign(concat(body_name, ".", "PhiG(1, 1)"), IG[i][2,2]),
-            do_assign(concat(body_name, ".", "PhiG(2, 2)"), IG[i][3,3]),
-            do_assign(concat(body_name, ".", "PhiG(0, 1)"), IG[i][1,2]),
-            do_assign(concat(body_name, ".", "PhiG(1, 0)"), IG[i][1,2]),
-            do_assign(concat(body_name, ".", "PhiG(0, 2)"), IG[i][1,3]),
-            do_assign(concat(body_name, ".", "PhiG(2, 0)"), IG[i][1,3]),
-            do_assign(concat(body_name, ".", "PhiG(1, 2)"), IG[i][2,3]),
-            do_assign(concat(body_name, ".", "PhiG(2, 1)"), IG[i][2,3])
-        ),
-        gentran(literal(cr)),
-        
-        if index_relative[i]=1 then (
-            gentran(literal("    ", eval(body_name), ".rel_base= body[", eval(BodyRef[i]-1), "]\;", cr)),
-            gentran(literal(cr))
-        ),
-        
+            gentran(literal("    Body<scalar_type, real_type, ", eval(nbrdof), "> ", eval(body_name), "\;", cr))
+        )
+    ),
+    
+    gentran(literal(cr)),
+    
+    for i:1 thru length(external) do
+        gentran(literal("    scalar_type ", eval(external[i]), "\;", cr)),
+    
+    gentran(literal(cr))
+    
+    /*for i:1 thru length(pre_calc_const) do
+        gentran(literal("    scalar_type ", eval(first(pre_calc_const[i])), "\;", cr))*/
+)$>>};
+
+template <typename scalar_type, typename real_type>
+MultiBodySystemODE<scalar_type, real_type>::MultiBodySystemODE(<<gentran(literal(eval(filename), "Parameters"))$>> &param):
+    param(param),
+<<block([i],
+    for i:1 thru nbrbody do (
         if length(elastic_dof_idx[i])>0 then (
-            gentran(literal("    int edof_idx", eval(i), "[]= {")),
+            body_name: concat("ebody", i)
+        ) else (
+            body_name: concat("body", i)
+        ),
+        if index_relative[i]=1 then (
+            if length(elastic_dof_idx[BodyRef[i]])>0 then (
+                ref_name: sconcat("ebody", BodyRef[i])
+            ) else (
+                ref_name: sconcat("body", BodyRef[i])
+            ),
+            gentran(literal("    ", eval(body_name), "(&", eval(ref_name)))
+        ) else (
+            gentran(literal("    ", eval(body_name), "(nullptr"))
+        ),
+                
+        if length(elastic_dof_idx[i])>0 then (
+            gentran(literal(", {")),
             for j:1 thru length(elastic_dof_idx[i]) do (
                 gentran(literal(eval(elastic_dof_idx[i][j]-1))),
                 if j#length(elastic_dof_idx[i]) then gentran(literal(", "))
             ),
-            gentran(literal("}\;", cr)),
-                                              
-            gentran(literal("    ", eval(body_name), ".edof.assign(edof_idx", eval(i), ", edof_idx", eval(i), "+", eval(length(elastic_dof_idx[i])), ")\;", cr)),
-            gentran(literal("    ", eval(body_name), ".md << ", eval(ebody[i]@md@M0[1, 1]), ", ", eval(ebody[i]@md@M0[2, 1]), ", ", eval(ebody[i]@md@M0[3, 1]), "\;", cr)),
-            for j:1 thru length(elastic_dof_idx[i]) do (
-                gentran(literal("    ", eval(body_name), ".Ct[", eval(j-1), "] << ", eval(ebody[i]@Ct@M0[j, 1]), ", ", eval(ebody[i]@Ct@M0[j, 2]), ", ", eval(ebody[i]@Ct@M0[j, 3]), "\;", cr))
-            ),
-            for j:1 thru length(elastic_dof_idx[i]) do (
-                gentran(literal("    ", eval(body_name), ".Cr[", eval(j-1), "] << ", eval(ebody[i]@Cr@M0[j, 1]), ", ", eval(ebody[i]@Cr@M0[j, 2]), ", ", eval(ebody[i]@Cr@M0[j, 3]), "\;", cr))
-            ),
-            for j:1 thru length(elastic_dof_idx[i]) do (
-                for k:1 thru length(elastic_dof_idx[i]) do (
-                    gentran(literal("    ", eval(body_name), ".Me(", eval((j-1)), ", ", eval(k-1), ")= ", eval(ebody[i]@Me@M0[j, k]), "\; "))
-                ),
-                gentran(literal(cr))
-            ),
-            for j:1 thru length(elastic_dof_idx[i]) do (
-                gentran(literal("    ", eval(body_name), ".Gr[", eval(j-1), "] << ", eval(ebody[i]@Gr@M0[j][1, 1]), ", ", eval(ebody[i]@Gr@M0[j][1, 2]), ", ", eval(ebody[i]@Gr@M0[j][1, 3]), ", ", eval(ebody[i]@Gr@M0[j][2, 1]), ", ", eval(ebody[i]@Gr@M0[j][2, 2]), ", ", eval(ebody[i]@Gr@M0[j][2, 3]), ", ", eval(ebody[i]@Gr@M0[j][3, 1]), ", ", eval(ebody[i]@Gr@M0[j][3, 2]), ", ", eval(ebody[i]@Gr@M0[j][3, 3]), "\;", cr))
-            ),
-            for j:1 thru length(elastic_dof_idx[i]) do (
-                for k:1 thru length(elastic_dof_idx[i]) do (
-                    gentran(literal("    ", eval(body_name), ".Ge[", eval((k-1)*length(elastic_dof_idx[i])+j-1), "] << ", eval(ebody[i]@Ge@M0[j][k, 1]), ", ", eval(ebody[i]@Ge@M0[j][k, 2]), ", ", eval(ebody[i]@Ge@M0[j][k, 3]), "\;", cr))
-                )
-            ),
-            for j:1 thru length(elastic_dof_idx[i]) do (
-                for k:1 thru 6 do (
-                    gentran(literal("    ", eval(body_name), ".Oe(", eval(j-1), ", ",  eval(k-1), ")= ", eval(ebody[i]@Oe@M0[j, k]), "\; "))
-                ),
-                gentran(literal(cr))
-            ),
-            for j:1 thru length(elastic_dof_idx[i]) do (
-                gentran(literal("    ", eval(body_name), ".K(", eval(j-1), ")= ", eval(ebody[i]@K@M0[j, j]), "\; "))
-            ),
-            gentran(literal(cr)),
-            for j:1 thru length(elastic_dof_idx[i]) do (
-                gentran(literal("    ", eval(body_name), ".D(", eval(j-1), ")= ", eval(ebody[i]@D@M0[j, j]), "\; "))
-            ),
-            gentran(literal(cr))
+            gentran(literal("}"))
         ),
-        gentran(literal("    body.push_back(&", eval(body_name), ")\;", cr)),
-        gentran(literal(cr))
+        
+        gentran(literal(")")),
+        if i#nbrbody then gentran(literal(",", cr))            
     )
 )$>>
-}
 
-void <<gentran(literal(eval(filename)))$>>System::computeMotion() {
-    // TODO write constant values only once
+{
+<<block([i, i_, j, k, l], 
+    ccurrind: 4,
+    genmat(gravity, 3, 1, 0, 0, "g"),
+    gentran(literal(cr)),
+        
+    for i:1 thru nbrbody do (
+        if length(elastic_dof_idx[i])>0 then (
+            body_name: concat("ebody", i),
+                                              
+            do_assign(concat(body_name, ".", 'mass), ebody[i]@refmod@mass),
+            genmat(ebody[i]@I@M0, 3, 3, 0, 0, concat(body_name, ".", "PhiG"))
+        ) else (
+            body_name: concat("body", i),
+            do_assign(concat(body_name, ".", 'mass), mass[i]),
+            genmat(IG[i], 3, 3, 0, 0, concat(body_name, ".", "PhiG"))
+        ),
+                
+        if length(elastic_dof_idx[i])>0 then (
+            genmat(ebody[i]@md@M0, 3, 1, 0, 0, concat(body_name, ".md")),
+                                              
+            for j:1 thru length(elastic_dof_idx[i]) do (
+                genmat(transpose(row(ebody[i]@Ct@M0, j)), 3, 1, 0, 0, concat(body_name, ".Ct[",  j-1, "]"))
+            ),
+
+            for j:1 thru length(elastic_dof_idx[i]) do (
+                genmat(transpose(row(ebody[i]@Cr@M0, j)), 3, 1, 0, 0, concat(body_name, ".Cr[",  j-1, "]"))
+            ),
+
+            genmat(ebody[i]@Me@M0, length(elastic_dof_idx[i]), length(elastic_dof_idx[i]), 0, 0, concat(body_name, ".Me")),
+
+            for j:1 thru length(elastic_dof_idx[i]) do (
+                genmat(ebody[i]@Gr@M0[j], 3, 3, 0, 0, concat(body_name, ".Gr[",  j-1, "]"))
+            ),
+
+            for j:1 thru length(elastic_dof_idx[i]) do (
+                for k:1 thru length(elastic_dof_idx[i]) do (
+                    for l:1 thru 3 do (
+                        do_assign(concat(body_name, ".Ge[", k-1, "](", l-1, ")"), ebody[i]@Ge@M0[j][k, l])
+                    )
+                )
+            ),
+            
+            genmat(ebody[i]@Oe@M0, length(elastic_dof_idx[i]), 6, 0, 0, concat(body_name, ".Oe")),
+            
+            for j:1 thru length(elastic_dof_idx[i]) do (
+                do_assign(concat(body_name, ".K(", j-1, ")"), ebody[i]@K@M0[j, j])
+            ),
+
+            for j:1 thru length(elastic_dof_idx[i]) do (
+                do_assign(concat(body_name, ".D(", j-1, ")"), ebody[i]@D@M0[j, j])
+            ),
+
+            gentran(literal(cr))
+        ),
+        
+        genmat(T0G[i], 3, 3, 0, 0, concat(body_name, ".TG.linear()"), 2),
+        genmat(col(T0G[i], 4), 3, 1, 0, 0, concat(body_name, ".TG.translation()"), 2),
+        gentran(literal(cr)),
+
+        genmat(vG[i], 3, 1, 0, 0, concat(body_name, ".vG"), 2),
+        gentran(literal(cr)),
+
+        genmat(omega[i], 3, 1, 0, 0, concat(body_name, ".omega"), 2),
+        gentran(literal(cr)),
+
+        genmat(aG[i], 3, 1, 0, 0, concat(body_name, ".aG"), 2),
+        gentran(literal(cr)),
+
+        genmat(omegad[i], 3, 1, 0, 0, concat(body_name, ".omegad"), 2),
+        gentran(literal(cr)),
+        
+        genmat(apply(addcol, cons(matrix(), vGpartial[i])), 3, nbrdof, 0, 0, concat(body_name, ".vGpartial"), 2),
+        gentran(literal(cr)),
+
+        genmat(apply(addcol, cons(matrix(), omegapartial[i])), 3, nbrdof, 0, 0, concat(body_name, ".omegapartial"), 2),
+        gentran(literal(cr)),
+        
+        genmat(Fext[i], 3, 1, 0, 0, concat(body_name, ".Fext"), 2),
+        gentran(literal(cr)),
+        genmat(Mext[i], 3, 1, 0, 0, concat(body_name, ".Mext"), 2),
+        gentran(literal(cr)),
+                             
+        if length(elastic_dof_idx[i])>0 then (
+            genmat(Fe_ext[i], length(elastic_dof_idx[i]), 1, 0, 0, concat(body_name, ".Fe_ext"), 2),
+            gentran(literal(cr))
+        )
+    )
+)$>>}
+
+
+template <typename scalar_type, typename real_type>
+VecQn<scalar_type> MultiBodySystemODE<scalar_type, real_type>::computeResiduals(const VecQn<scalar_type> &q, const VecQn<scalar_type> &qd, const VecQn<scalar_type> &qdd, const VecUn<scalar_type> &u) {
+    // computeMotion
 <<block([i, i_], 
     ccurrind: 4,
     if nbrdep > 0 then gentran(literal("// Dependant variables", cr)),
@@ -122,67 +215,370 @@ void <<gentran(literal(eval(filename)))$>>System::computeMotion() {
         do_assign('pd[i_], pdi[i]),
         do_assign('pdd[i_], pddi[i]),
         gentran(literal(cr))))$>>
-        
 <<block([i, i_, j, k], 
     ccurrind: 4,
     for i:1 thru nbrbody do (
-        i_: i-1,
-        for j:1 thru 3 do (
-            for k:1 thru 3 do (
-                do_assign(concat("body[", i_, "]->TG.linear()(", j-1, ", ", k-1, ")"), T0G[i][j,k])
-            )
-        ),
-        for j:1 thru 3 do (
-            do_assign(concat("body[", i_, "]->TG.translation()(", j-1, ")"), T0G[i][j,4])
-        ),
-        gentran(literal(cr)),
-
-        for j:1 thru 3 do (
-            do_assign(concat("body[", i_, "]->vG(", j-1, ")"), vG[i][j, 1])
-        ),
-        gentran(literal(cr)),
-
-        for j:1 thru 3 do (
-            do_assign(concat("body[", i_, "]->omega(", j-1, ")"), omega[i][j, 1])
-        ),
-        gentran(literal(cr)),
-
-        for j:1 thru 3 do (
-            do_assign(concat("body[", i_, "]->aG(", j-1, ")"), aG[i][j, 1])
-        ),
-        gentran(literal(cr)),
-
-        for j:1 thru 3 do (
-            do_assign(concat("body[", i_, "]->omegad(", j-1, ")"), omegad[i][j, 1])
-        ),
-        gentran(literal(cr)),
-        for j:1 thru nbrdof do (
-            j_: j-1,
-            for k:1 thru 3 do (
-                do_assign(concat("body[", i_, "]->vGpartial(", k-1, ", ", j_,")"), vGpartial[i][j][k, 1])
-            )
-        ),
-        gentran(literal(cr)),
-        for j:1 thru nbrdof do (
-            j_: j-1,
-            for k:1 thru 3 do (
-                do_assign(concat("body[", i_, "]->omegapartial(", k-1, ", ", j_, ")"), omegapartial[i][j][k, 1])
-            )
+        if length(elastic_dof_idx[i])>0 then (
+            body_name: concat("ebody", i)
+        ) else (
+            body_name: concat("body", i)
         ),
         
-        if length(elastic_dof_idx[i])>0 then
-            gentran(literal("    static_cast<ElasticBody*>(body[", eval(i_), "])->setEDOF(q, qd, qdd)\;", cr, cr)),
+        genmat(T0G[i], 3, 3, 0, 0, concat(body_name, ".TG.linear()"), 1),
+        genmat(col(T0G[i], 4), 3, 1, 0, 0, concat(body_name, ".TG.translation()"), 1),
+        gentran(literal(cr)),
+
+        genmat(vG[i], 3, 1, 0, 0, concat(body_name, ".vG"), 1),
+        gentran(literal(cr)),
+
+        genmat(omega[i], 3, 1, 0, 0, concat(body_name, ".omega"), 1),
+        gentran(literal(cr)),
+
+        genmat(aG[i], 3, 1, 0, 0, concat(body_name, ".aG"), 1),
+        gentran(literal(cr)),
+
+        genmat(omegad[i], 3, 1, 0, 0, concat(body_name, ".omegad"), 1),
+        gentran(literal(cr)),
+        
+        genmat(apply(addcol, cons(matrix(), vGpartial[i])), 3, nbrdof, 0, 0, concat(body_name, ".vGpartial"), 1),
+        gentran(literal(cr)),
+
+        genmat(apply(addcol, cons(matrix(), omegapartial[i])), 3, nbrdof, 0, 0, concat(body_name, ".omegapartial"), 1),
+        gentran(literal(cr)),
+        
+        if length(elastic_dof_idx[i])>0 then (
+            gentran(literal("    ", eval(body_name), ".setEDOF(q, qd, qdd)\;", cr))
+        ),
         
         if index_relative[i]=1 then (
-            gentran(literal("    body[", eval(i_), "]->composeMotion()\;", cr))
+            gentran(literal("    ", eval(body_name), ".composeMotion()\;", cr))
         ),
         gentran(literal(cr)),
         gentran(literal(cr))
     )
 )$>>
+
+<<block([], 
+    if length(external) > 0 then (
+        gentran(literal("    calculateForces(q, qd, qdd, u)\;", cr))
+    )
+)$>>
+    // computeForceBalances
+<<block([i], 
+    ccurrind: 4,
+    for i:1 thru nbrbody do (
+        if length(elastic_dof_idx[i])>0 then (
+            body_name: concat("ebody", i)
+        ) else (
+            body_name: concat("body", i)
+        ),
+        gentran(literal("    ", eval(body_name), ".computeForceBalance()\;", cr))
+    )
+)$>>
+
+    // computeGravity
+<<block([i], 
+    ccurrind: 4,
+    for i:1 thru nbrbody do (
+        if length(elastic_dof_idx[i])>0 then (
+            body_name: concat("ebody", i)
+        ) else (
+            body_name: concat("body", i)
+        ),
+        gentran(literal("    ", eval(body_name), ".computeGravity(g)\;", cr))
+    )
+)$>>
+
+    VecQn<scalar_type> f_;
+    f_.setZero();
+<<block([i], 
+    ccurrind: 4,
+    for i:1 thru nbrbody do (
+        if length(elastic_dof_idx[i])>0 then (
+            body_name: concat("ebody", i)
+        ) else (
+            body_name: concat("body", i)
+        ),
+        gentran(literal("    ", eval(body_name), ".generalizedBalance(f_)\;", cr))
+    )
+)$>>
+
+    return f_;
 }
 
-void <<gentran(literal(eval(filename)))$>>System::computeAppliedEfforts() {
-<<if file_search(user_file)#false then gentranin(user_file)$>>
+template <typename scalar_type, typename real_type>
+VecYn<scalar_type> MultiBodySystemODE<scalar_type, real_type>::calcOut(const VecQn<scalar_type> &q, const VecQn<scalar_type> &qd, const VecQn<scalar_type> &qdd, const VecUn<scalar_type> &u) {
+    VecYn<scalar_type> y;
+<<block([opt], 
+    ccurrind: 4,
+    
+    opt: genopt([y]),
+        
+    for i:1 thru nbrout do (
+        i_: i-1,
+        do_assign(concat("y[", i_, "]"), opt[1][i])
+    )
+)$>>
+
+    return y;
+}
+
+<<block([], 
+    if default_states=0 then (
+        for i:1 thru nbrdof do (
+            gentran(literal("#define ", eval(states[i]), " q[", eval(i-1), "]", cr)), 
+            gentran(literal("#define ", eval(states_d[i]), " qd[", eval(i-1), "]", cr)), 
+            gentran(literal("#define ", eval(states_dd[i]), " qdd[", eval(i-1), "]", cr))
+        ),
+        for i:1 thru nbrin do
+            gentran(literal("#define ", eval(u[i]), " u[", eval(i-1), "]", cr)),
+        gentran(literal(cr))
+    ),
+        
+    if length(external) > 0 then (
+        gentran(literal("#include \"", eval(filename), "_Forces.hpp\"", cr))
+    ),
+    
+    if default_states=0 then (
+        gentran(literal(cr)),
+        for i:1 thru nbrdof do (
+            gentran(literal("#undef ", eval(states[i]), cr)), 
+            gentran(literal("#undef ", eval(states_d[i]), cr)), 
+            gentran(literal("#undef ", eval(states_dd[i]), cr))
+        ),
+        for i:1 thru nbrin do
+            gentran(literal("#undef ", eval(u[i]), cr))
+    )
+)$>>
+
+
+class <<gentran(literal(eval(filename), ": public NewmarkBeta<", eval(nbrdof), ", ", eval(nbrin), ", ", eval(nbrout), ", real_type>"))$>> {
+public:
+    <<gentran(literal(eval(filename)))$>>();
+        
+    virtual VecQn<real_type> computeResiduals();
+    virtual void calcJacobian(real_type alphaM, real_type alphaC, real_type alphaK);
+    virtual void calcB();
+    virtual void calcCDF();
+    virtual void calcOut();
+    
+    <<gentran(literal(eval(filename), "Parameters"))$>> param;
+    
+    MultiBodySystemODE<real_type, real_type> r_system;
+    MultiBodySystemODE<duals::dual<real_type>, real_type> d_system;
+
+<<block([i],
+    gentran(literal("    struct inputs_t {", cr)),
+    gentran(literal("    public:", cr)),
+    gentran(literal("        inputs_t(")),
+    for i:1 thru nbrin do (
+        gentran(literal("real_type &", eval(u[i]))),
+        if i#nbrin then
+            gentran(literal(", "))
+    ),            
+    gentran(literal(") : ")),
+    for i:1 thru nbrin do (
+        gentran(literal(eval(u[i]), "(", eval(u[i]), ")")),
+        if i#nbrin then
+            gentran(literal(", "))
+    ),            
+    gentran(literal(" {}\;", cr, cr)),
+    for i:1 thru nbrin do (
+        gentran(literal("        real_type &", eval(u[i]), "\;", cr))
+    ),            
+    gentran(literal("    } inputs\;", cr)),
+        
+    if default_states=0 then (
+        gentran(literal(cr, "    struct states_t {", cr)),
+        gentran(literal("    public:", cr)),
+        gentran(literal("        states_t(")),
+        for i:1 thru nbrdof do (
+            gentran(literal("real_type &", eval(states[i]), ", real_type &", eval(states_d[i]), ", real_type &", eval(states_dd[i]))),
+            if i#nbrdof then
+                gentran(literal(", "))
+        ),            
+        gentran(literal(") : ")),
+        for i:1 thru nbrdof do (
+            gentran(literal(eval(states[i]), "(", eval(states[i]), "), ", eval(states_d[i]),"(", eval(states_d[i]), "), ", eval(states_dd[i]),"(", eval(states_dd[i]), ")")),
+            if i#nbrdof then
+                gentran(literal(", "))
+        ),            
+        gentran(literal(" {}\;", cr, cr)),
+                              
+        for i:1 thru nbrdof do (
+            gentran(literal("        real_type &", eval(states[i]), "\;", cr)),
+            gentran(literal("        real_type &", eval(states_d[i]), "\;", cr)),
+            gentran(literal("        real_type &", eval(states_dd[i]), "\;", cr))
+        ),            
+        gentran(literal("    } states\;", cr, cr)),
+
+        gentran(literal(cr, "    typedef struct {", cr)),
+        for i:1 thru nbrdof do (
+            gentran(literal("        int ", eval(states[i]), "\;", cr))
+        ),            
+        gentran(literal("    } states_idx_type\;", cr)),
+        
+        gentran(literal(cr, "    typedef struct {", cr)),
+        for i:1 thru nbrin do (
+            gentran(literal("        int ", eval(u[i]), "\;", cr))
+        ),            
+        gentran(literal("    } inputs_idx_type\;", cr)),
+
+        gentran(literal(cr, "    typedef struct {", cr)),
+        for i:1 thru nbrout do (
+            gentran(literal("        int ", eval(output_names[i]), "\;", cr))
+        ),            
+        gentran(literal("    } outputs_idx_type\;", cr))
+    )
+)$>>
+
+    static const states_idx_type states_idx;
+    static const inputs_idx_type inputs_idx;
+    static const outputs_idx_type outputs_idx;
+};
+
+const <<gentran(literal(eval(filename)))$>>::states_idx_type <<gentran(literal(eval(filename)))$>>::states_idx= {<<block([i], for i:1 thru nbrdof do (gentran(literal(eval(i-1))), if i#nbrdof then gentran(literal(", "))))$>>};
+const <<gentran(literal(eval(filename)))$>>::inputs_idx_type <<gentran(literal(eval(filename)))$>>::inputs_idx= {<<block([i], for i:1 thru nbrin do (gentran(literal(eval(i-1))), if i#nbrin then gentran(literal(", "))))$>>};
+const <<gentran(literal(eval(filename)))$>>::outputs_idx_type <<gentran(literal(eval(filename)))$>>::outputs_idx= {<<block([i], for i:1 thru nbrout do (gentran(literal(eval(i-1))), if i#nbrout then gentran(literal(", "))))$>>};
+
+<<gentran(literal(eval(filename)))$>>::<<gentran(literal(eval(filename)))$>>() : 
+    NewmarkBeta("<<gentran(literal(eval(filename)))$>>", "<<gentran(literal(eval(title)))$>>"),
+    param(),
+    r_system(param),
+    d_system(param),
+<<block([i],
+    gentran(literal("    inputs(")),
+    for i:1 thru nbrin do (
+        gentran(literal("u.data()[", eval(i-1), "]")),
+        if i#nbrin then
+            gentran(literal(", "))
+    ),            
+                    
+    if default_states=0 then (
+        gentran(literal("),", cr, "    states(")),
+        for i:1 thru nbrdof do (
+            gentran(literal("q.data()[", eval(i-1), "], qd.data()[", eval(i-1), "], qdd.data()[", eval(i-1), "]")),
+            if i#nbrdof then
+                gentran(literal(", "))
+        )
+    ),
+    gentran(literal(")", cr))
+)$>>{
+<<block([i, i_, opt], 
+        ccurrind: 4,
+        save_subst_list: subst_list,
+        subst_list: [],
+        
+        for i:1 thru nbrin do (
+            i_: i-1,
+            do_assign(concat("in_name[", i_, "]"), concat("\"", u[i], "\""))
+        ),
+        if default_states=0 then (
+            gentran(literal(cr)),
+            for i:1 thru nbrdof do (
+                i_: i-1,
+                do_assign(concat("state_name[", i_, "]"), concat("\"", states[i], "\""))
+            )
+        ),
+        subst_list: save_subst_list
+)$>>}
+
+
+VecQn<real_type> <<gentran(literal(eval(filename)))$>>::computeResiduals() {
+    return r_system.computeResiduals(q, qd, qdd, u);
+}
+
+void <<gentran(literal(eval(filename)))$>>::calcJacobian(real_type alphaM, real_type alphaC, real_type alphaK) {
+    VecQn<duals::dual<real_type<<gentran(literal(">>"))$>> d_q= q;
+    VecQn<duals::dual<real_type<<gentran(literal(">>"))$>> d_qd= qd;
+    VecQn<duals::dual<real_type<<gentran(literal(">>"))$>> d_qdd= qdd;
+    VecUn<duals::dual<real_type<<gentran(literal(">>"))$>> d_u= u;
+    VecQn<duals::dual<real_type<<gentran(literal(">>"))$>> d_f;
+    
+    for(int jddl= 0; jddl < nbrdof; jddl++) {
+        d_q[jddl].dpart(alphaK);
+        d_qd[jddl].dpart(alphaC);
+        d_qdd[jddl].dpart(alphaM);
+
+        if(!doflocked[jddl]) {
+            d_f= d_system.computeResiduals(d_q, d_qd, d_qdd, d_u);
+            for(int idof= 0; idof < nbrdof; idof++)
+                if(doflocked[idof]) d_f[idof]= 0.0;
+            
+            Jacobian.col(jddl)= dpart(d_f);
+        } else
+            Jacobian.col(jddl).setZero();
+
+        d_q[jddl].dpart(0.0);
+        d_qd[jddl].dpart(0.0);
+        d_qdd[jddl].dpart(0.0);
+    }
+    f= rpart(d_f);
+}
+
+void <<gentran(literal(eval(filename)))$>>::calcB() {
+    VecQn<duals::dual<real_type<<gentran(literal(">>"))$>> d_q= q;
+    VecQn<duals::dual<real_type<<gentran(literal(">>"))$>> d_qd= qd;
+    VecQn<duals::dual<real_type<<gentran(literal(">>"))$>> d_qdd= qdd;
+    VecUn<duals::dual<real_type<<gentran(literal(">>"))$>> d_u= u;
+    VecQn<duals::dual<real_type<<gentran(literal(">>"))$>> d_f;
+
+    for(int jddl= 0; jddl < nbrin; jddl++) {
+        d_u[jddl].dpart(1.0);
+        
+        d_f= d_system.computeResiduals(d_q, d_qd, d_qdd, d_u);
+        B.col(jddl)= dpart(d_f);
+        
+        d_u[jddl].dpart(0.0);
+    }
+}
+
+void <<gentran(literal(eval(filename)))$>>::calcCDF() {
+    VecQn<duals::dual<real_type<<gentran(literal(">>"))$>> d_q= q;
+    VecQn<duals::dual<real_type<<gentran(literal(">>"))$>> d_qd= qd;
+    VecQn<duals::dual<real_type<<gentran(literal(">>"))$>> d_qdd= qdd;
+    VecUn<duals::dual<real_type<<gentran(literal(">>"))$>> d_u= u;
+    VecYn<duals::dual<real_type<<gentran(literal(">>"))$>> d_y;
+    
+    for(int jddl= 0; jddl < nbrdof; jddl++) {
+        d_q[jddl].dpart(1.0);
+        
+        d_y= d_system.calcOut(d_q, d_qd, d_qdd, d_u);
+        CD.col(jddl)= dpart(d_y);
+        
+        d_q[jddl].dpart(0.0);
+    }
+    for(int jddl= 0; jddl < nbrdof; jddl++) {
+        d_qd[jddl].dpart(1.0);
+        
+        d_y= d_system.calcOut(d_q, d_qd, d_qdd, d_u);
+        CD.col(jddl+nbrdof)= dpart(d_y);
+        
+        d_qd[jddl].dpart(0.0);
+    }
+    for(int jddl= 0; jddl < nbrin; jddl++) {
+        d_u[jddl].dpart(1.0);
+        
+        d_y= d_system.calcOut(d_q, d_qd, d_qdd, d_u);
+        CD.col(jddl+2*nbrdof)= dpart(d_y);
+        
+        d_u[jddl].dpart(0.0);
+    }
+    
+    
+    for(int jddl= 0; jddl < nbrdof; jddl++) {
+        d_qdd[jddl].dpart(1.0);
+        
+        d_y= d_system.calcOut(d_q, d_qd, d_qdd, d_u);
+        F.col(jddl)= dpart(d_y);
+        
+        d_qdd[jddl].dpart(0.0);
+    }
+    y= rpart(d_y);
+    
+}
+
+void <<gentran(literal(eval(filename)))$>>::calcOut() {
+    y= r_system.calcOut(q, qd, qdd, u);
 }
 

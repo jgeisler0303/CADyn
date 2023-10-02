@@ -2,115 +2,135 @@ do_assign(n_work, e_work):= block([],
     gentran(lrsetq(eval(n_work), scanmap('float, subst(subst_list, e_work))))
 );
 
-cagem_gen_cpp_recursive(sysdef, [target_dir]):= block([i, j, i_, j_, file, title, nbrdof, nbrbody, nbrin, nbrdep, gravity, mass, IG, T0G, vG, omega, aG, omegad, vGpartial, omegapartial, BodyRef, ebody, elastic_dof_idx, pi, pdi, pddi, qi, qdi, FinalTime, StepSave, StepMax],
-    file: sysdef@file,
-    title: sysdef@name,
-    nbrdof: sysdef@nbrdof,
-    nbrbody: sysdef@nbrbody,
-    nbrin: sysdef@nbrin,
-    nbrdep: sysdef@nbrdep,
-    gravity: sysdef@gravity,
-    mass: sysdef@mass,
-    IG: sysdef@IG,
-    T0G: sysdef@T0G,
-    vG: sysdef@vG,
-    omega: sysdef@omega,
-    aG: sysdef@aG,
-    omegad: sysdef@omegad,
-    vGpartial: sysdef@vGpartial,
-    omegapartial: sysdef@omegapartial,
-    BodyRef: sysdef@BodyRef,
-    ebody: sysdef@ebody,
-    elastic_dof_idx: sysdef@elastic_dof_idx,
-    pi: sysdef@pi,
-    pdi: sysdef@pdi,
-    pddi: sysdef@pddi,
-    qi: sysdef@qi,
-    qdi: sysdef@qdi,
-    FinalTime: sysdef@FinalTime,
-    StepSave: sysdef@StepSave,
-    StepMax: sysdef@StepMax,
-    
-    for i:1 thru nbrbody do (
-        for j:1 thru nbrdof do (
-            j_: j-1,
-            vG[i]: subst(qdd[j_], qdd[j], vG[i]),
-            vG[i]: subst(qd[j_], qd[j], vG[i]),
-            vG[i]: subst(q[j_], q[j], vG[i]),
-            omega[i]: subst(qdd[j_], qdd[j], omega[i]),
-            omega[i]: subst(qd[j_], qd[j], omega[i]),
-            omega[i]: subst(q[j_], q[j], omega[i]),
-            aG[i]: subst(qdd[j_], qdd[j], aG[i]),
-            aG[i]: subst(qd[j_], qd[j], aG[i]),
-            aG[i]: subst(q[j_], q[j], aG[i]),
-            omegad[i]: subst(qdd[j_], qdd[j], omegad[i]),
-            omegad[i]: subst(qd[j_], qd[j], omegad[i]),
-            omegad[i]: subst(q[j_], q[j], omegad[i]),
-            T0G[i]: subst(qdd[j_], qdd[j], T0G[i]),
-            T0G[i]: subst(qd[j_], qd[j], T0G[i]),
-            T0G[i]: subst(q[j_], q[j], T0G[i]),
-            vGpartial[i]: subst(qdd[j_], qdd[j], vGpartial[i]),
-            vGpartial[i]: subst(qd[j_], qd[j], vGpartial[i]),
-            vGpartial[i]: subst(q[j_], q[j], vGpartial[i]),
-            omegapartial[i]: subst(qdd[j_], qdd[j], omegapartial[i]),
-            omegapartial[i]: subst(qd[j_], qd[j], omegapartial[i]),
-            omegapartial[i]: subst(q[j_], q[j], omegapartial[i])
-        ),
-        for j:1 thru nbrdep do (
-            j_: j-1,
-            vG[i]: subst(pdd[j_], pdd[j], vG[i]),
-            vG[i]: subst(pd[j_], pd[j], vG[i]),
-            vG[i]: subst(p[j_], p[j], vG[i]),
-            omega[i]: subst(pdd[j_], pdd[j], omega[i]),
-            omega[i]: subst(pd[j_], pd[j], omega[i]),
-            omega[i]: subst(p[j_], p[j], omega[i]),
-            aG[i]: subst(pdd[j_], pdd[j], aG[i]),
-            aG[i]: subst(pd[j_], pd[j], aG[i]),
-            aG[i]: subst(p[j_], p[j], aG[i]),
-            omegad[i]: subst(pdd[j_], pdd[j], omegad[i]),
-            omegad[i]: subst(pd[j_], pd[j], omegad[i]),
-            omegad[i]: subst(p[j_], p[j], omegad[i]),
-            T0G[i]: subst(pdd[j_], pdd[j], T0G[i]),
-            T0G[i]: subst(pd[j_], pd[j], T0G[i]),
-            T0G[i]: subst(p[j_], p[j], T0G[i]),
-            vGpartial[i]: subst(pdd[j_], pdd[j], vGpartial[i]),
-            vGpartial[i]: subst(pd[j_], pd[j], vGpartial[i]),
-            vGpartial[i]: subst(p[j_], p[j], vGpartial[i]),
-            omegapartial[i]: subst(pdd[j_], pdd[j], omegapartial[i]),
-            omegapartial[i]: subst(pd[j_], pd[j], omegapartial[i]),
-            omegapartial[i]: subst(p[j_], p[j], omegapartial[i])
-        )
-    ),
-    for i:1 thru nbrdep do (
-        for j:1 thru nbrdof do (
-            j_: j-1,
-            pi[i]: subst(qdd[j_], qdd[j], pi[i]),
-            pi[i]: subst(qd[j_], qd[j], pi[i]),
-            pi[i]: subst(q[j_], q[j], pi[i]),
-            pdi[i]: subst(qdd[j_], qdd[j], pdi[i]),
-            pdi[i]: subst(qd[j_], qd[j], pdi[i]),
-            pdi[i]: subst(q[j_], q[j], pdi[i]),
-            pddi[i]: subst(qdd[j_], qdd[j], pddi[i]),
-            pddi[i]: subst(qd[j_], qd[j], pddi[i]),
-            pddi[i]: subst(q[j_], q[j], pddi[i])
-        ),
-        for j:1 thru nbrdep do (
-            j_: j-1,
-            pi[i]: subst(pdd[j_], pdd[j], pi[i]),
-            pi[i]: subst(pd[j_], pd[j], pi[i]),
-            pi[i]: subst(p[j_], p[j], pi[i]),
-            pdi[i]: subst(pdd[j_], pdd[j], pdi[i]),
-            pdi[i]: subst(pd[j_], pd[j], pdi[i]),
-            pdi[i]: subst(p[j_], p[j], pdi[i]),
-            pddi[i]: subst(pdd[j_], pdd[j], pddi[i]),
-            pddi[i]: subst(pd[j_], pd[j], pddi[i]),
-            pddi[i]: subst(p[j_], p[j], pddi[i])
-        )
+make_c_index(v, nbrdof, nbrdep):= block([v_, j, j_],
+    v_: v,
+
+    for j:1 thru nbrdof do (
+        j_: j-1,
+        
+        v_: subst(qdd[j_], qdd[j], v_),
+        v_: subst(qd[j_], qd[j], v_),
+        v_: subst(q[j_], q[j], v_)
     ),
     
+    for j:1 thru nbrdep do (
+        j_: j-1,
+        
+        v_: subst(pdd[j_], pdd[j], v_),
+        v_: subst(pd[j_], pd[j], v_),
+        v_: subst(p[j_], p[j], v_)
+    ),
+    
+    v_
+);
+
+genopt(l):= block([o, temps, replace_list, i],
+    o: optimize(l),
+
+    if op(o)#'block then
+        return(o),
+        
+    temps: inpart(o, 1),
+
+    pre_replace_list: makelist(temps[i]=concat(temp, i), i, 1, length(temps)),
+    replace_list: [],
+    
+    for i: 1 thru length(temps) do (
+        if not(listp(inpart(o, i+1, 2)) or matrixp(inpart(o, i+1, 2))) then (
+            gentran(literal("        real_type ")),
+            do_assign(concat(temp, i), subst(pre_replace_list, inpart(o, i+1, 2))),
+            replace_list: endcons(pre_replace_list[i], replace_list)
+        ) else (
+            replace_list: endcons(inpart(o, i+1, 1)=inpart(o, i+1, 2), replace_list)
+        )
+    ),
+
+    subst(replace_list, subst(replace_list, inpart(o, length(temps)+2)))
+);
+
+genmat(M, n, m, on, om, name, [varargs]):= block([i, j, i_, j_],
+    with_only_consts: 0,
+    if length(varargs)>0 then
+        with_only_consts: varargs[1],
+    
+    for i:1 thru n do (
+        i_: i-1,
+        for j:1 thru m do (
+            j_: j-1,
+            if listp(M) then
+                M_element: M[(on+i-1)*m + om+j]
+            else
+                M_element: M[on+i, om+j],
+                
+            if with_only_consts=0 or (not(constantp(M_element)) and with_only_consts=1) or (constantp(M_element) and with_only_consts=2) then
+                do_assign(concat(name, "(", i_, ", ", j_, ")"), M_element)
+        )
+    )    
+);
+
+cagem_gen_cpp_recursive(sysdef, [varargs]):= block([i, j, i_, j_, file, title, nbrdof, nbrbody, nbrin, nbrdep, gravity, mass, IG, T0G, vG, omega, aG, omegad, vGpartial, omegapartial, BodyRef, ebody, elastic_dof_idx, pi, pdi, pddi, qi, qdi, FinalTime, StepSave, StepMax],
+    file: sysdef@sys_rel@file,
+    title: sysdef@sys_rel@name,
+    nbrdof: sysdef@sys_rel@nbrdof,
+    nbrbody: sysdef@sys_rel@nbrbody,
+    nbrin: sysdef@sys_rel@nbrin,
+    nbrdep: sysdef@sys_rel@nbrdep,
+    nbrout: length(sysdef@outputs),
+    gravity: sysdef@sys_rel@gravity,
+    mass: sysdef@sys_rel@mass,
+    IG: sysdef@sys_rel@IG,
+    T0G: make_c_index(sysdef@sys_rel@T0G, nbrdof, nbrdep),
+    vG: make_c_index(sysdef@sys_rel@vG, nbrdof, nbrdep),
+    omega: make_c_index(sysdef@sys_rel@omega, nbrdof, nbrdep),
+    aG: make_c_index(sysdef@sys_rel@aG, nbrdof, nbrdep),
+    omegad: make_c_index(sysdef@sys_rel@omegad, nbrdof, nbrdep),
+    vGpartial: make_c_index(sysdef@sys_rel@vGpartial, nbrdof, nbrdep),
+    omegapartial: make_c_index(sysdef@sys_rel@omegapartial, nbrdof, nbrdep),
+    BodyRef: sysdef@sys_rel@BodyRef,
+    ebody: sysdef@sys_rel@ebody,
+    elastic_dof_idx: sysdef@sys_rel@elastic_dof_idx,
+    u: sysdef@sys_rel@u,
+    output_names: sysdef@sys_rel@out_names,
+    default_states: sysdef@sys_rel@default_states,
+    states: sysdef@sys_rel@states,
+    states_d: sysdef@sys_rel@states_d,
+    states_dd: sysdef@sys_rel@states_dd,
+    y: make_c_index(sysdef@outputs, nbrdof, nbrdep),
+    external: sysdef@sys_rel@external,
+    params: listify(append(sysdef@params, sysdef@sys_rel@ext_param)),
+    pi: make_c_index(sysdef@sys_rel@pi, nbrdof, nbrdep),
+    pdi: make_c_index(sysdef@sys_rel@pdi, nbrdof, nbrdep),
+    pddi: make_c_index(sysdef@sys_rel@pddi, nbrdof, nbrdep),
+    qi: sysdef@sys_rel@qi,
+    qdi: sysdef@sys_rel@qdi,
+    FinalTime: sysdef@sys_rel@FinalTime,
+    StepSave: sysdef@sys_rel@StepSave,
+    StepMax: sysdef@sys_rel@StepMax,
+    
+    pre_calc_const: sysdef@const_eqns,
+    const_matrix_once: 0,
+    if length(varargs)>1 then
+        if varargs[2]=1 then
+            const_matrix_once: 1,
+
+    subst_list: [],
+    if default_states=0 then (
+        for i:1 thru nbrdof do (
+            subst_list: endcons(sysdef@sys_rel@states[i]='q[i-1], subst_list),
+            subst_list: endcons(sysdef@sys_rel@states_d[i]='qd[i-1], subst_list),
+            subst_list: endcons(sysdef@sys_rel@states_dd[i]='qdd[i-1], subst_list)
+        )
+    ),
+    for i:1 thru nbrin do
+        subst_list: endcons(sysdef@sys_rel@u[i]='u[i-1], subst_list),
+    for i:1 thru nbrin do
+        subst_list: endcons(sysdef@sys_rel@u[i]='u[i-1], subst_list),
+    for i:1 thru length(sysdef@params) do
+        subst_list: endcons(sysdef@params[i]=concat('param\., sysdef@params[i]), subst_list),
+
     filepath: pathname_directory(file),
-    if length(target_dir)>0 then (
-        filepath: target_dir[1],
+    if length(varargs)>0 then (
+        filepath: varargs[1],
         if slength(filepath)>0 then
             if notequal(substring (filepath, slength(filepath), slength(filepath)+1),"/") then
                 filepath: sconcat(filepath, "/")
@@ -125,22 +145,31 @@ cagem_gen_cpp_recursive(sysdef, [target_dir]):= block([i, j, i_, j_, file, title
     gentranseg: false,
     clinelen: 1000,
     
-    out_name: sconcat(filepath, filename, "System.hpp"),
+    out_name: sconcat(filepath, filename, "_recursive.hpp"),
     if file_search(out_name)#false then delete_file(out_name),
-    templ_name: ssubst("cadyn_cpp.tem", "cagem.mac", cagem_dir),
-
-    user_file: sconcat(filename, ".AppEff.hpp"),
+    templ_name: ssubst("cadyn_recursive.cpp.tem", "cagem.mac", cagem_dir),
     gentranin(templ_name, [out_name]),
     
-    app_file: sconcat(filepath, filename, "_app.cpp"),
-    if file_search(app_file)=false then (
-        app_file: sconcat(filepath, filename, "System.hpp"),
-        if file_search(app_file)#false then delete_file(app_file),
-        templ_name: ssubst("cadyn_cpp_app.tem", "cagem.mac", cagem_dir),
+    out_name: sconcat(filepath, filename, "_recursive_param.hpp"),
+    if file_search(out_name)#false then delete_file(out_name),
+    templ_name: ssubst("cadyn_direct_params.hpp.tem", "cagem.mac", cagem_dir),
+    gentranin(templ_name, [out_name]),
 
-        user_file: sconcat(filename, ".AppEff.hpp"),
-        gentranin(templ_name, [app_file])
-    )
+    
+    
+/*    ext_file: sconcat(filepath, filename, "_Externals.hpp"),
+    if file_search(ext_file)=false then (
+        ext_file_source: sconcat(pathname_directory(file), filename, "_Externals.hpp"),
+        
+        if not(file_search(ext_file_source)=false) then (
+            copy_file(ext_file_source, ext_file)
+        ) else (
+            templ_name: ssubst("cadyn_direct_external.hpp.tem", "cagem.mac", cagem_dir),
+            gentranin(templ_name, [ext_file])
+        )
+    ),*/
+    
+    done
 );
 
 

@@ -3,14 +3,56 @@ cagem(file, [varargs]):= block([output, i, appliedF, appliedM, appliedFe, T0G, a
 
     output@sys_rel: prepareInput(file),
     output@sys_rel: prepareKinematics(output@sys_rel),
+   
+    if length(varargs)>1 then (
+        if varargs[2]=1 then (
+            output@sys_rel@nbrdof: length(output@sys_rel@states) + length(output@sys_rel@f_ext),
+
+            for i:1 thru output@sys_rel@nbrbody do (
+                output@sys_rel@T0G[i]: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^3=0], output@sys_rel@T0G[i]))),
+                output@sys_rel@vG[i]: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^3=0], output@sys_rel@vG[i]))),
+                output@sys_rel@aG[i]: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^3=0], output@sys_rel@aG[i]))),
+                output@sys_rel@omega[i]: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^3=0], output@sys_rel@omega[i]))),
+                output@sys_rel@omegad[i]: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^3=0], output@sys_rel@omegad[i]))),
+                output@sys_rel@vGpartial[i]: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^3=0], output@sys_rel@vGpartial[i]))),
+                output@sys_rel@omegapartial[i]: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^3=0], output@sys_rel@omegapartial[i])))
+            ),
+            if member('modelOutputsRecursive, map(op, functions)) then (
+                output@outputs: modelOutputsRecursive(output),
+                output@outputs: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^3=0], output@outputs))),
+                print("Done with outputs")
+            ) else
+                output@outputs: [],
+            
+            all_vars: [output@outputs, output@sys_rel@gravity, output@sys_rel@T0G, output@sys_rel@vG, output@sys_rel@omega, output@sys_rel@aG, output@sys_rel@omegad, output@sys_rel@vGpartial, output@sys_rel@omegapartial, output@sys_rel@external, output@sys_rel@pi, output@sys_rel@appliedF, output@sys_rel@appliedM, output@sys_rel@appliedFe],
+            for i:1 thru output@sys_rel@nbrbody do (
+                if length(output@sys_rel@elastic_dof_idx[i])>0 then (
+                    all_vars: append(all_vars, [output@sys_rel@ebody[i]])
+                ) else (
+                    all_vars: append(all_vars, [output@sys_rel@mass[i], output@sys_rel@IG[i]])
+                )
+            ),
+            
+            output@params: listify(subset(setify(listofvars(all_vars)), lambda([x], not(member(x, output@sys_rel@states) or member(x, output@sys_rel@states_d) or member(x, output@sys_rel@states_dd) or member(x, output@sys_rel@u) or member(x, output@sys_rel@external) or member(x, output@sys_rel@d_external) or x=t)))),
+
+            apply(declare, [output@params, constant]),
+  
+            return(output)
+        )
+    ),
+        
     output@sys_abs: composeMotion(output@sys_rel),
     print("Done with composeMotion"),
+    
     output@forces: computeForceBalance(output@sys_abs),
     print("Done with computeForceBalance"),
     
     appliedForcesZero(output@sys_abs),
     for i:1 thru output@sys_abs@nbrbody do T0G[i]: output@sys_abs@T0G[i],
     appliedForces(),
+    output@sys_rel@appliedF: copy(appliedF),
+    output@sys_rel@appliedM: copy(appliedM),
+    output@sys_rel@appliedFe: copy(appliedFe),
     
     for i: 1 thru output@sys_rel@nbrbody do (
         output@forces@R[i]: output@forces@R[i] + appliedF[i],
