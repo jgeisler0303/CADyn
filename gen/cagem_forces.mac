@@ -9,10 +9,8 @@ applyForceIn0(r, Fin0, T0G):= block([],
 );
 
 appliedForcesZero(sys):= (
-    for i:1 thru sys@nbrbody do (
-        appliedF[i]: zeromatrix(3, 1),
-        appliedM[i]: zeromatrix(3, 1),
-        appliedFe[i]: zeromatrix(length(sys@elastic_dof_idx[i]), 1)
-    )
+    appliedF: makelist(zeromatrix(3, 1), i, 1, sys@nbrbody),
+    appliedM: makelist(zeromatrix(3, 1), i, 1, sys@nbrbody),
+    appliedFe: makelist(zeromatrix(length(sys@elastic_dof_idx[i]), 1), i, 1, sys@nbrbody)
 );
 
