@@ -47,20 +47,23 @@ public:
     VecQ_int dqx_idx;
     
     MatSt ekfSigma;
+    MatSt ekfSigma_pred;
     MatSt ekfQ;
     MatO ekfR;
+    MatO ekfS;
+    
+#ifdef ZERO_MEAN_TUNING
+    VecO ep_mean;
+    VecSt Dx_mean;
+#endif
+    
+    real_type d_norm;
     
     VecO adaptScale;
-    VecSt adaptUpdate;
+    VecSt fixedQxx;
     
     real_type T_adapt= -1.0;
 };
-
-// template <int nbrstates_, class system_type> const int EKF_autotune<nbrstates_, system_type>::nbrstates= nbrstates_;
-// template <int nbrstates_, class system_type> const int EKF_autotune<nbrstates_, system_type>::nbrdof= system_type::nbrdof;
-// template <int nbrstates_, class system_type> const int EKF_autotune<nbrstates_, system_type>::nbrin= system_type::nbrin;
-// template <int nbrstates_, class system_type> const int EKF_autotune<nbrstates_, system_type>::nbrout= system_type::nbrout;
-
 
 template <int nbrstates_, class system_type>
 EKF_autotune<nbrstates_, system_type>::EKF_autotune() {
@@ -69,10 +72,15 @@ EKF_autotune<nbrstates_, system_type>::EKF_autotune() {
     ekfQ*= 1.0e-6;
     ekfR.setIdentity();
     adaptScale.setConstant(1.0);
-    adaptUpdate.setConstant(1.0);
+    fixedQxx.setZero();
     
     x_ul.setConstant(std::numeric_limits<real_type>::infinity());
     x_ll.setConstant(-std::numeric_limits<real_type>::infinity());
+
+#ifdef ZERO_MEAN_TUNING
+    ep_mean.setZero();
+    Dx_mean.setZero();
+#endif
 }
 
 template <int nbrstates_, class system_type>
@@ -112,23 +120,25 @@ void EKF_autotune<nbrstates_, system_type>::next(real_type ts, const Eigen::Ref<
     }
     
     // Kalman equation according to Dan Simon eq (7.14)
-    MatSt Sigma_pred= ekfA * ekfSigma * ekfA.transpose() + ekfQ;
-    MatStO SC= Sigma_pred*ekfC.transpose();
-    MatO CSC= ekfC*SC;
-    MatO R_= CSC + ekfR;
-    MatO R_inv= R_.ldlt().solve(MatO::Identity());
-    MatStO ekfK= SC * R_inv;
+    ekfSigma_pred= ekfA * ekfSigma * ekfA.transpose() + ekfQ;
+    MatStO SigC= ekfSigma_pred*ekfC.transpose();
+    MatO CSigC= ekfC*SigC;
+    ekfS= CSigC + ekfR;
+    MatO S_inv= ekfS.ldlt().solve(MatO::Identity());
+    MatStO ekfK= SigC * S_inv;
     
-    ekfSigma= Sigma_pred - ekfK*SC.transpose();
+    ekfSigma= ekfSigma_pred - ekfK*SigC.transpose();
     ekfSigma= 0.5*(ekfSigma+ekfSigma.transpose());
     
     VecO d= y_meas-system.y;
+    d_norm= (d.transpose()*S_inv*d)(0);
+    
     VecSt Dx= ekfK*d;
     
     if(!is_finite(Dx))
         throw EKFException("EKF: Kalman update is not finite.");
         
-    x+= Dx.cwiseProduct(adaptUpdate);
+    x+= Dx;
     
     // apply limits
     for(int i= 0; i<nbrstates; ++i)
@@ -145,11 +155,30 @@ void EKF_autotune<nbrstates_, system_type>::next(real_type ts, const Eigen::Ref<
     if(T_adapt>0.0) {
         real_type alpha_adapt= exp(-ts/T_adapt);
         VecO ep= d - ekfC*ekfK*d; // should be real residual: y_meas-h(x_corr), but d= y_meas-y_pred, x_corr=x_pred+K*d, C*K*d=C*x_corr-C*x_pred=y_corr-y_pred, d-C*K*d=y_meas-y_pred-(y_corr-y_pred)=y_meas-y_corr
+#ifdef ZERO_MEAN_TUNING
+        ep_mean= alpha_adapt*ep_mean + (1.0-alpha_adapt)*ep;
+        ep-= ep_mean;
+#endif        
         ep= ep.cwiseProduct(adaptScale);
 
-        ekfR= alpha_adapt*ekfR + (1.0-alpha_adapt)*(ep*ep.transpose() + CSC);
+        ekfR= alpha_adapt*ekfR + (1.0-alpha_adapt)*(ep*ep.transpose() + CSigC);
 
+#ifdef ZERO_MEAN_TUNING
+        Dx_mean= alpha_adapt*Dx_mean + (1.0-alpha_adapt)*Dx;        
+        Dx-= Dx_mean;
+#endif        
         ekfQ= alpha_adapt*ekfQ + (1.0-alpha_adapt) * Dx*Dx.transpose();
+        for(int i= 0; i<nbrstates; ++i) {
+            if(fixedQxx(i)>0.0) {
+                ekfQ.row(i).setZero();
+                ekfQ.col(i).setZero();
+                ekfQ(i, i)= fixedQxx(i);
+            }
+            else if(fixedQxx(i)<0.0) {
+                ekfQ(i, i)= -fixedQxx(i);
+            }
+        }
+
     }    
 }
 

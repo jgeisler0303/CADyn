@@ -22,8 +22,9 @@
 #define rhs_idx_R 9
 #define rhs_idx_T_adapt 10
 #define rhs_idx_adaptScale 11
-#define rhs_idx_adaptUpdate 12
+#define rhs_idx_fixedQxx 12
 #define rhs_idx_opt 13
+#define rhs_idx_P 14
 
 #define lhs_idx_q 0
 #define lhs_idx_qd 1
@@ -32,6 +33,11 @@
 #define lhs_idx_Q 4
 #define lhs_idx_R 5
 #define lhs_idx_time 6
+#define lhs_idx_d_norm 7
+#define lhs_idx_p_xx 8
+#define lhs_idx_r_xx 9
+#define lhs_idx_s_xx 10
+#define lhs_idx_P 11
 
 typedef EKF_autotune<EKF_STATES, SYSTEM> EKF;
 
@@ -58,8 +64,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
         return;
     }
     
-    if(nrhs<8 || nrhs>14) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of arguments. Expecting (q0, dq0, u, y, param, ts, x_ul, x_ll, {Q, R, T_adapt, adaptScale, options})"); return; }
-    if(nlhs<4 || nlhs>7) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of return values. Expecting [q, qd, qdd, y, {Q, R, cpu_time}]"); return; }
+    if(nrhs<8 || nrhs>15) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of arguments. Expecting (q0, dq0, u, y, param, ts, x_ul, x_ll, {Q, R, T_adapt, adaptScale, options, P0})"); return; }
+    if(nlhs<4 || nlhs>12) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of return values. Expecting [q, qd, qdd, y, {Q, R, cpu_time, d_norm, p_xx, r_xx, s_xx, P_end}]"); return; }
     
     if(!mxIsDouble(prhs[rhs_idx_q0]) || mxGetNumberOfElements(prhs[rhs_idx_q0])!=EKF::nbrdof) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'q0' (%d expected)", EKF::nbrdof); return; }
     
@@ -85,7 +91,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 
     if(!mxIsDouble(prhs[rhs_idx_adaptScale]) || mxGetNumberOfElements(prhs[rhs_idx_adaptScale])!=EKF::nbrout) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'rhs_idx_adaptScale' (%d expected)", EKF::nbrout); return; }
     
-    if(!mxIsDouble(prhs[rhs_idx_adaptUpdate]) || mxGetNumberOfElements(prhs[rhs_idx_adaptUpdate])!=EKF::nbrstates) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'rhs_idx_adaptUpdate' (%d expected)", EKF::nbrstates); return; }
+    if(!mxIsDouble(prhs[rhs_idx_fixedQxx]) || mxGetNumberOfElements(prhs[rhs_idx_fixedQxx])!=EKF::nbrstates) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'rhs_idx_fixedQxx' (%d expected)", EKF::nbrstates); return; }
 
     const mxArray *mxParams= prhs[rhs_idx_p];
     if(!mxIsStruct(mxParams) || mxGetNumberOfElements(mxParams)!=1) {
@@ -198,6 +204,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
             for(int j=0; j<EKF::nbrout; ++j)
                 ekf.ekfR(i, j)= R[i + j*EKF::nbrout];
     }
+    if(nrhs>rhs_idx_P && !mxIsEmpty(prhs[rhs_idx_P])) {
+        double *P= mxGetPr(prhs[rhs_idx_P]);
+        for(int i=0; i<EKF::nbrstates; ++i)
+            for(int j=0; j<EKF::nbrstates; ++j)
+                ekf.ekfSigma(i, j)= P[i + j*EKF::nbrstates];
+    }
     if(nrhs>rhs_idx_T_adapt)
         ekf.T_adapt= mxGetScalar(prhs[rhs_idx_T_adapt]);
         
@@ -207,10 +219,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
             ekf.adaptScale(i)= adaptScale[i];
     }
 
-    if(nrhs>rhs_idx_adaptUpdate && !mxIsEmpty(prhs[rhs_idx_adaptUpdate])) {
-        double *adaptUpdate= mxGetPr(prhs[rhs_idx_adaptUpdate]);
+    if(nrhs>rhs_idx_fixedQxx && !mxIsEmpty(prhs[rhs_idx_fixedQxx])) {
+        double *fixedQxx= mxGetPr(prhs[rhs_idx_fixedQxx]);
         for(int i=0; i<EKF::nbrstates; ++i)
-            ekf.adaptUpdate(i)= adaptUpdate[i];
+            ekf.fixedQxx(i)= fixedQxx[i];
     }
 
     double *u= mxGetPr(prhs[rhs_idx_u]);
@@ -224,6 +236,19 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     plhs[lhs_idx_qd]= mxCreateDoubleMatrix(EKF::nbrdof, mxGetN(prhs[rhs_idx_u]), mxREAL);
     plhs[lhs_idx_qdd]= mxCreateDoubleMatrix(EKF::nbrdof, mxGetN(prhs[rhs_idx_u]), mxREAL);
     plhs[lhs_idx_y]= mxCreateDoubleMatrix(EKF::nbrout, mxGetN(prhs[rhs_idx_u]), mxREAL);
+
+    if(nlhs>lhs_idx_d_norm) {
+        plhs[lhs_idx_d_norm]= mxCreateDoubleMatrix(1, mxGetN(prhs[rhs_idx_u]), mxREAL);
+    }    
+    if(nlhs>lhs_idx_p_xx) {
+        plhs[lhs_idx_p_xx]= mxCreateDoubleMatrix(ekf.nbrstates, mxGetN(prhs[rhs_idx_u]), mxREAL);
+    }    
+    if(nlhs>lhs_idx_r_xx) {
+        plhs[lhs_idx_r_xx]= mxCreateDoubleMatrix(ekf.nbrout, mxGetN(prhs[rhs_idx_u]), mxREAL);
+    }    
+    if(nlhs>lhs_idx_s_xx) {
+        plhs[lhs_idx_s_xx]= mxCreateDoubleMatrix(ekf.nbrout, mxGetN(prhs[rhs_idx_u]), mxREAL);
+    }    
     
     EKF::VecO y_meas_vec;
     
@@ -247,6 +272,22 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
                 mxGetPr(plhs[lhs_idx_qdd])[j + i*ekf.nbrdof]= ekf.system.qdd(j);
             for(int j=0; j<ekf.nbrout; ++j)
                 mxGetPr(plhs[lhs_idx_y])[j + i*ekf.nbrout]= ekf.system.y(j);
+            
+            if(nlhs>lhs_idx_d_norm) {
+                mxGetPr(plhs[lhs_idx_d_norm])[i]= ekf.d_norm;
+            }    
+            if(nlhs>lhs_idx_p_xx) {
+                for(int j=0; j<ekf.nbrstates; ++j)
+                    mxGetPr(plhs[lhs_idx_p_xx])[j + i*ekf.nbrstates]= ekf.ekfSigma_pred(j, j);
+            }    
+            if(nlhs>lhs_idx_r_xx) {
+                for(int j=0; j<ekf.nbrout; ++j)
+                    mxGetPr(plhs[lhs_idx_r_xx])[j + i*ekf.nbrout]= ekf.ekfR(j, j);
+            }    
+            if(nlhs>lhs_idx_s_xx) {
+                for(int j=0; j<ekf.nbrout; ++j)
+                mxGetPr(plhs[lhs_idx_s_xx])[j + i*ekf.nbrout]= ekf.ekfS(j, j);
+            }    
         }
     } catch(std::exception &e) {
         mexWarnMsgIdAndTxt("CADyn:EKF", "Error EKF: %s", e.what());
@@ -265,6 +306,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
         for(int i=0; i<EKF::nbrout; ++i)
             for(int j=0; j<EKF::nbrout; ++j)
                 mxGetPr(plhs[lhs_idx_R])[i + j*EKF::nbrout]= ekf.ekfR(i, j);
+    }    
+    if(nlhs>lhs_idx_P) {
+        plhs[lhs_idx_P]= mxCreateDoubleMatrix(EKF::nbrstates, EKF::nbrstates, mxREAL);
+        for(int i=0; i<EKF::nbrstates; ++i)
+            for(int j=0; j<EKF::nbrstates; ++j)
+                mxGetPr(plhs[lhs_idx_P])[i + j*EKF::nbrstates]= ekf.ekfSigma(i, j);
     }    
     if(nlhs>lhs_idx_time) {
         plhs[lhs_idx_time]= mxCreateDoubleMatrix(1, 1, mxREAL);
