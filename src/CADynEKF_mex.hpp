@@ -23,8 +23,9 @@
 #define rhs_idx_T_adapt 10
 #define rhs_idx_adaptScale 11
 #define rhs_idx_fixedQxx 12
-#define rhs_idx_opt 13
-#define rhs_idx_P 14
+#define rhs_idx_fixedRxx 13
+#define rhs_idx_opt 14
+#define rhs_idx_P 15
 
 #define lhs_idx_q 0
 #define lhs_idx_qd 1
@@ -64,7 +65,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
         return;
     }
     
-    if(nrhs<8 || nrhs>15) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of arguments. Expecting (q0, dq0, u, y, param, ts, x_ul, x_ll, {Q, R, T_adapt, adaptScale, options, P0})"); return; }
+    if(nrhs<8 || nrhs>16) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of arguments. Expecting (q0, dq0, u, y, param, ts, x_ul, x_ll, {Q, R, T_adapt, adaptScale, fixedQxx, fixedRxx, options, P0})"); return; }
     if(nlhs<4 || nlhs>12) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of return values. Expecting [q, qd, qdd, y, {Q, R, cpu_time, d_norm, p_xx, r_xx, s_xx, P_end}]"); return; }
     
     if(!mxIsDouble(prhs[rhs_idx_q0]) || mxGetNumberOfElements(prhs[rhs_idx_q0])!=EKF::nbrdof) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'q0' (%d expected)", EKF::nbrdof); return; }
@@ -92,6 +93,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     if(!mxIsDouble(prhs[rhs_idx_adaptScale]) || mxGetNumberOfElements(prhs[rhs_idx_adaptScale])!=EKF::nbrout) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'rhs_idx_adaptScale' (%d expected)", EKF::nbrout); return; }
     
     if(!mxIsDouble(prhs[rhs_idx_fixedQxx]) || mxGetNumberOfElements(prhs[rhs_idx_fixedQxx])!=EKF::nbrstates) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'rhs_idx_fixedQxx' (%d expected)", EKF::nbrstates); return; }
+
+    if(!mxIsDouble(prhs[rhs_idx_fixedRxx]) || mxGetNumberOfElements(prhs[rhs_idx_fixedRxx])!=EKF::nbrout) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'rhs_idx_fixedRxx' (%d expected)", EKF::nbrout); return; }
 
     const mxArray *mxParams= prhs[rhs_idx_p];
     if(!mxIsStruct(mxParams) || mxGetNumberOfElements(mxParams)!=1) {
@@ -223,6 +226,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
         double *fixedQxx= mxGetPr(prhs[rhs_idx_fixedQxx]);
         for(int i=0; i<EKF::nbrstates; ++i)
             ekf.fixedQxx(i)= fixedQxx[i];
+    }
+
+    if(nrhs>rhs_idx_fixedRxx && !mxIsEmpty(prhs[rhs_idx_fixedRxx])) {
+        double *fixedRxx= mxGetPr(prhs[rhs_idx_fixedRxx]);
+        for(int i=0; i<EKF::nbrout; ++i)
+            ekf.fixedRxx(i)= fixedRxx[i];
     }
 
     double *u= mxGetPr(prhs[rhs_idx_u]);

@@ -61,6 +61,7 @@ public:
     
     VecO adaptScale;
     VecSt fixedQxx;
+    VecO fixedRxx;
     
     real_type T_adapt= -1.0;
 };
@@ -73,6 +74,7 @@ EKF_autotune<nbrstates_, system_type>::EKF_autotune() {
     ekfR.setIdentity();
     adaptScale.setConstant(1.0);
     fixedQxx.setZero();
+    fixedRxx.setZero();
     
     x_ul.setConstant(std::numeric_limits<real_type>::infinity());
     x_ll.setConstant(-std::numeric_limits<real_type>::infinity());
@@ -162,6 +164,16 @@ void EKF_autotune<nbrstates_, system_type>::next(real_type ts, const Eigen::Ref<
         ep= ep.cwiseProduct(adaptScale);
 
         ekfR= alpha_adapt*ekfR + (1.0-alpha_adapt)*(ep*ep.transpose() + CSigC);
+        for(int i= 0; i<nbrout; ++i) {
+            if(fixedRxx(i)>0.0) {
+                ekfR.row(i).setZero();
+                ekfR.col(i).setZero();
+                ekfR(i, i)= fixedRxx(i);
+            }
+            else if(fixedRxx(i)<0.0) {
+                ekfR(i, i)= -fixedRxx(i);
+            }
+        }
 
 #ifdef ZERO_MEAN_TUNING
         Dx_mean= alpha_adapt*Dx_mean + (1.0-alpha_adapt)*Dx;        

@@ -20,26 +20,27 @@
 bool tryGetOption(double *value, const char *name, const mxArray *mxOptions, int m__=1, int n__=1);
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
-    if(nrhs<4 || nrhs>6) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of arguments. Expecting (x0, dx0, u, p, {ts, {options}})"); return; }
+    if(nrhs<5 || nrhs>7) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of arguments. Expecting (x0, dx0, ddx0, u, p, {ts, {options}})"); return; }
     if(nlhs<1 || nlhs>12) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of return values. Expecting [x, {dx, {ddx, {y, {sensitivity, {out_sens, {converged, {cpu_time, {error, {n_steps, {n_back_steps, {n_sub_steps}}}}}}}}}}}]"); return; }
     if(nrhs==4 && nlhs!=1) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "When four arguments are supplied only the output is calculated and returned as the one and only return value"); return; }
     
     if(!mxIsDouble(prhs[0]) || mxGetNumberOfElements(prhs[0])!=MBSystemClass::nbrdof) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'x0' (%d expected)", MBSystemClass::nbrdof); return; }
     if(!mxIsDouble(prhs[1]) || mxGetNumberOfElements(prhs[1])!=MBSystemClass::nbrdof) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'dx0' (%d expected)", MBSystemClass::nbrdof); return; }
+    if(!mxIsDouble(prhs[2]) || mxGetNumberOfElements(prhs[2])!=MBSystemClass::nbrdof) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'dx0' (%d expected)", MBSystemClass::nbrdof); return; }
     // TODO: enable more than one sim step
-    if(!mxIsDouble(prhs[2]) || mxGetNumberOfElements(prhs[2])!=MBSystemClass::nbrin) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'u' (%d expected)", MBSystemClass::nbrin); return; }
+    if(!mxIsDouble(prhs[3]) || mxGetNumberOfElements(prhs[3])!=MBSystemClass::nbrin) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'u' (%d expected)", MBSystemClass::nbrin); return; }
     
-    if(nrhs>=5)
-        if(!mxIsDouble(prhs[4]) || mxGetNumberOfElements(prhs[4])!=1) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'ts' (1 expected)"); return; }
+    if(nrhs>=6)
+        if(!mxIsDouble(prhs[5]) || mxGetNumberOfElements(prhs[5])!=1) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'ts' (1 expected)"); return; }
     
-    const mxArray *mxParams= prhs[3];
+    const mxArray *mxParams= prhs[4];
     if(!mxIsStruct(mxParams) || mxGetNumberOfElements(mxParams)!=1) {
         mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Input p must be a scalar struct.\n");
         return;
     }
     
-    if(nrhs>=6) {
-        const mxArray *mxOptions= prhs[5];
+    if(nrhs>=7) {
+        const mxArray *mxOptions= prhs[6];
         if(!mxIsStruct(mxOptions) || mxGetNumberOfElements(mxOptions)!=1) {
             mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Input options must be a scalar struct.\n");
             return;
@@ -64,8 +65,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     }
     system.precalcConsts();
     
-    if(nrhs>=6) {
-        const mxArray *mxOptions= prhs[5];
+    if(nrhs>=7) {
+        const mxArray *mxOptions= prhs[6];
         double value;
         
         if(tryGetOption(&value, "AbsTol", mxOptions))
@@ -103,13 +104,17 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     for(int i=0; i<MBSystemClass::nbrdof; ++i)
         system.qd(i)= dx0[i];
     
-    double *u_sim= mxGetPr(prhs[2]);;
+    double *ddx0= mxGetPr(prhs[2]);
+    for(int i=0; i<MBSystemClass::nbrdof; ++i)
+        system.qdd(i)= ddx0[i];
+    
+    double *u_sim= mxGetPr(prhs[3]);;
     for(int i=0; i<MBSystemClass::nbrin; ++i)
         system.u(i)= u_sim[i];
     
-    double ts= 0.0;;
-    if(nrhs>=5) {
-        ts= mxGetScalar(prhs[4]);
+    double ts= 0.0;
+    if(nrhs>=6) {
+        ts= mxGetScalar(prhs[5]);
     } else {
         system.calcOut();
         plhs[0]= mxCreateDoubleMatrix(MBSystemClass::nbrout, 1, mxREAL);
@@ -124,9 +129,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     bool res= true;
     try {
         if(ts==0.0)
+            system.newmarkOneStep(0.0);
+        else if(ts==-1)
             system.staticEquilibriumWithLin();
         else
-            system.newmarkIntervalWithSens_restart(ts);
+            system.newmarkIntervalWithSens(ts);
     } catch (const std::exception& e) {
         mexWarnMsgIdAndTxt("CADyn:Integrator", "CADyn Error: %s", e.what());
         res= false;
