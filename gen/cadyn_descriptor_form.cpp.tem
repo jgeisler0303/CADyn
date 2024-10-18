@@ -1,0 +1,472 @@
+<<gentran(literal("\/\* File generated form template cadyn_descriptor_form.cpp.tem on ", eval(timedate()), ". Do not edit! \*\/", cr))$>>
+<<gentran(literal("\/\* Multibody system: ", eval(title), " \*\/", cr, cr))$>>
+
+#include <string>
+#include <map>
+#include <fstream>
+#include <iostream>
+#include <stdlib.h>
+#include <chrono>
+#include <cstdio>
+#include <ctime>
+
+
+typedef double real_type;
+
+#include "<<gentran(literal(eval(filename)))$>>_param.hpp"
+
+#define mcond(c, a, x, b) ((c)? a:b)
+
+
+class <<gentran(literal(eval(filename)))$>> {
+public:
+    typedef Eigen::Matrix<real_type, <<gentran(literal(eval(nbrdep)))$>>, 1> VecP;
+    typedef Eigen::Matrix<real_type, <<gentran(literal(eval(nbrdof)))$>>, 1> VecQ;
+    typedef Eigen::Matrix<real_type, <<gentran(literal(eval(nbrin)))$>>, 1> VecI;
+    typedef Eigen::Matrix<real_type, <<gentran(literal(eval(nbrout)))$>>, 1> VecO;
+    typedef Eigen::Matrix<real_type, <<gentran(literal(eval(nbrdof)))$>>, <<gentran(literal(eval(nbrdof)))$>> > MatQ;
+    typedef Eigen::Matrix<real_type, <<gentran(literal(eval(nbrdof)))$>>, <<gentran(literal(eval(nbrin)))$>> > MatQI;
+    typedef Eigen::Matrix<real_type, <<gentran(literal(eval(nbrout)))$>>, <<gentran(literal(eval(nbrdof)))$>> > MatOQ;
+    typedef Eigen::Matrix<real_type, <<gentran(literal(eval(nbrout)))$>>, <<gentran(literal(eval(2*nbrdof+nbrin)))$>> > MatCD;
+    typedef Eigen::Matrix<real_type, <<gentran(literal(eval(2*nbrdof)))$>>, <<gentran(literal(eval(2*nbrdof)))$>> > Mat2Q;
+    typedef Eigen::Matrix<real_type, <<gentran(literal(eval(2*nbrdof)))$>>, <<gentran(literal(eval(2*nbrdof + nbrin)))$>> > MatS;
+    
+    <<gentran(literal(eval(filename)))$>>();
+        
+    void precalcConsts();
+    void calcMf();
+    void calcJacobian();
+    void calcB();
+    void calcCDF();
+    void calcOut();
+<<block([], 
+    if length(external) > 0 then (
+        gentran(literal("    void calculateExternal()\;", cr)),
+        gentran(literal("    void calculateExternalWithDeriv()\;", cr))
+    )
+)$>>
+    
+    <<gentran(literal(eval(filename), "Parameters"))$>> param;
+    
+// private:
+    static const int nbrdof = <<gentran(literal(eval(nbrdof)))$>>;
+    static const int nbrout = <<gentran(literal(eval(nbrout)))$>>;
+    static const int nbrin = <<gentran(literal(eval(nbrin)))$>>;
+    std::array<std::string, nbrdof> state_name;
+    std::array<std::string, nbrin> in_name;
+    VecQ f;
+    MatQ M;
+    MatOQ F;
+    MatQI B;
+    MatQ K;
+    MatQ C;
+    MatCD CD;
+    VecQ q, qd, qdd;
+    VecI u;
+    VecO y;
+
+<<block([i],
+    gentran(literal("    struct inputs_t {", cr)),
+    gentran(literal("    public:", cr)),
+    gentran(literal("        inputs_t(")),
+    for i:1 thru nbrin do (
+        gentran(literal("real_type &", eval(u[i]))),
+        if i#nbrin then
+            gentran(literal(", "))
+    ),            
+    gentran(literal(") : ")),
+    for i:1 thru nbrin do (
+        gentran(literal(eval(u[i]), "(", eval(u[i]), ")")),
+        if i#nbrin then
+            gentran(literal(", "))
+    ),            
+    gentran(literal(" {}\;", cr, cr)),
+    for i:1 thru nbrin do (
+        gentran(literal("        real_type &", eval(u[i]), "\;", cr))
+    ),            
+    gentran(literal("    } inputs\;", cr)),
+        
+    if default_states=0 then (
+        gentran(literal(cr, "    struct states_t {", cr)),
+        gentran(literal("    public:", cr)),
+        gentran(literal("        states_t(")),
+        for i:1 thru nbrdof do (
+            gentran(literal("real_type &", eval(states[i]), ", real_type &", eval(states_d[i]), ", real_type &", eval(states_dd[i]))),
+            if i#nbrdof then
+                gentran(literal(", "))
+        ),            
+        gentran(literal(") : ")),
+        for i:1 thru nbrdof do (
+            gentran(literal(eval(states[i]), "(", eval(states[i]), "), ", eval(states_d[i]),"(", eval(states_d[i]), "), ", eval(states_dd[i]),"(", eval(states_dd[i]), ")")),
+            if i#nbrdof then
+                gentran(literal(", "))
+        ),            
+        gentran(literal(" {}\;", cr, cr)),
+                              
+        for i:1 thru nbrdof do (
+            gentran(literal("        real_type &", eval(states[i]), "\;", cr)),
+            gentran(literal("        real_type &", eval(states_d[i]), "\;", cr)),
+            gentran(literal("        real_type &", eval(states_dd[i]), "\;", cr))
+        ),            
+        gentran(literal("    } states\;", cr, cr)),
+
+        gentran(literal(cr, "    typedef struct {", cr)),
+        for i:1 thru nbrdof do (
+            gentran(literal("        int ", eval(states[i]), "\;", cr))
+        ),            
+        gentran(literal("    } states_idx_type\;", cr)),
+        
+        gentran(literal(cr, "    typedef struct {", cr)),
+        for i:1 thru nbrin do (
+            gentran(literal("        int ", eval(u[i]), "\;", cr))
+        ),            
+        gentran(literal("    } inputs_idx_type\;", cr)),
+
+        gentran(literal(cr, "    typedef struct {", cr)),
+        for i:1 thru nbrout do (
+            gentran(literal("        int ", eval(output_names[i]), "\;", cr))
+        ),            
+        gentran(literal("    } outputs_idx_type\;", cr))
+    )
+)$>>
+
+    static const states_idx_type states_idx;
+    static const inputs_idx_type inputs_idx;
+    static const outputs_idx_type outputs_idx;
+    
+<<block([i], 
+    for i:1 thru length(external) do
+        gentran(literal("    real_type ", eval(external[i]), "\;", cr)),
+        
+    for i:1 thru length(d_external) do
+        gentran(literal("    real_type ", eval(d_external[i]), "\;", cr))
+)$>>
+
+<<block([i], 
+    for i:1 thru length(pre_calc_const) do
+        gentran(literal("    real_type ", eval(first(pre_calc_const[i])), "\;", cr))
+)$>>
+};
+
+const <<gentran(literal(eval(filename)))$>>::states_idx_type <<gentran(literal(eval(filename)))$>>::states_idx= {<<block([i], for i:1 thru nbrdof do (gentran(literal(eval(i-1))), if i#nbrdof then gentran(literal(", "))))$>>};
+const <<gentran(literal(eval(filename)))$>>::inputs_idx_type <<gentran(literal(eval(filename)))$>>::inputs_idx= {<<block([i], for i:1 thru nbrin do (gentran(literal(eval(i-1))), if i#nbrin then gentran(literal(", "))))$>>};
+const <<gentran(literal(eval(filename)))$>>::outputs_idx_type <<gentran(literal(eval(filename)))$>>::outputs_idx= {<<block([i], for i:1 thru nbrout do (gentran(literal(eval(i-1))), if i#nbrout then gentran(literal(", "))))$>>};
+
+<<gentran(literal(eval(filename)))$>>::<<gentran(literal(eval(filename)))$>>() : 
+    param(),
+<<block([i],
+    gentran(literal("    inputs(")),
+    for i:1 thru nbrin do (
+        gentran(literal("u.data()[", eval(i-1), "]")),
+        if i#nbrin then
+            gentran(literal(", "))
+    ),            
+                    
+    if default_states=0 then (
+        gentran(literal("),", cr, "    states(")),
+        for i:1 thru nbrdof do (
+            gentran(literal("q.data()[", eval(i-1), "], qd.data()[", eval(i-1), "], qdd.data()[", eval(i-1), "]")),
+            if i#nbrdof then
+                gentran(literal(", "))
+        )
+    ),
+    gentran(literal(")", cr))
+)$>>{
+<<block([i, i_, opt], 
+        ccurrind: 4,
+        save_subst_list: subst_list,
+        subst_list: [],
+        
+        for i:1 thru nbrin do (
+            i_: i-1,
+            do_assign(concat("in_name[", i_, "]"), concat("\"", u[i], "\""))
+        ),
+        if default_states=0 then (
+            gentran(literal(cr)),
+            for i:1 thru nbrdof do (
+                i_: i-1,
+                do_assign(concat("state_name[", i_, "]"), concat("\"", states[i], "\""))
+            )
+        ),
+        subst_list: save_subst_list
+)$>>}
+
+void <<gentran(literal(eval(filename)))$>>::precalcConsts() {
+<<block([i], 
+    for i:1 thru length(pre_calc_const) do
+        do_assign(first(pre_calc_const[i]), second(pre_calc_const[i])),
+        
+    if const_matrix_once=1 then (    
+        gentran(literal(cr)),
+        genmat(E, nbrdof, nbrdof, nbrdof, nbrdof, "M", 2),
+        gentran(literal(cr)),
+        genmat(-A, nbrdof, nbrdof, nbrdof, nbrdof, "C", 2),
+        gentran(literal(cr)),
+        genmat(-A, nbrdof, nbrdof, nbrdof, 0, "K", 2),
+        
+        gentran(literal(cr)),
+        genmat(-B, nbrdof, nbrin, nbrdof, 0, "B", 2),
+            
+        gentran(literal(cr)),
+        genmat(C, length(y), 2*nbrdof, 0, 0, "CD", 2),
+        gentran(literal(cr)),
+        genmat(D, length(y), nbrin, 0, 0, "CD.block(0, 2*nbrdof, nbrout, nbrin)", 2),
+        gentran(literal(cr)),
+        genmat(F, length(y), nbrdof, 0, 0, "F", 2)
+    )
+)$>>    
+}
+
+void <<gentran(literal(eval(filename)))$>>::calcMf() {
+<<block([],
+    if length(external) > 0 then (
+        gentran(literal("    calculateExternal()\;", cr, cr))
+    )
+)$>>
+    {
+<<block([i, i_, opt],
+    ccurrind: 8,
+
+    if nbrdep > 0 then (
+        gentran(literal("    // Dependant variables", cr)),
+        gentran("    {", literal(cr)),
+
+        opt: genopt([pi, pdi, pddi]),
+        gentran(literal(cr)),
+
+        for i:1 thru nbrdep do (
+            i_: i-1,
+            do_assign('p[i_], opt[1][i]),
+            do_assign('pd[i_], opt[2][i]),
+            do_assign('pdd[i_], opt[3][i]),
+            gentran(literal(cr))
+        ),
+        gentran("    }", literal(cr))
+    )
+)$>>
+    }
+    {
+<<block([i, i_, opt, QDD, f_],
+    ccurrind: 8,
+    if const_matrix_once=1 then (
+        E_no_const: matrixmap(lambda([e], if constantp(e) then 0 else e), E),
+        A_no_const: matrixmap(lambda([e], if constantp(e) then 0 else e), A)
+    ) else (
+        E_no_const: E,
+        A_no_const: A
+    ),
+    
+    QDD: transpose(apply(matrix, [states_dd])),
+    f_: ratsimp(M.QDD-transpose(matrix(f))),
+    
+    opt: genopt([flatten(create_list(f_[i],i,1,nbrdof)), E_no_const]),
+    gentran(literal(cr)),
+    genmat(opt[2], nbrdof, nbrdof, nbrdof, nbrdof, "M", const_matrix_once),
+    
+    gentran(literal(cr)),
+    for i:1 thru nbrdof do (
+        i_: i-1,
+        do_assign(concat("f[", i_, "]"), opt[1][i])
+    )
+)$>>
+    }
+}
+
+void <<gentran(literal(eval(filename)))$>>::calcJacobian() {
+<<block([], 
+    if length(external) > 0 then (
+        gentran(literal("    calculateExternalWithDeriv()\;", cr))
+    )
+)$>>
+    {
+<<block([i, i_, opt], 
+    ccurrind: 8,
+
+    if nbrdep > 0 then (
+        gentran(literal("    // Dependant variables", cr)),
+        gentran("    {", literal(cr)),
+                    
+        opt: genopt([pi, pdi, pddi]),
+        gentran(literal(cr)),
+
+        for i:1 thru nbrdep do (
+            i_: i-1,
+            do_assign('p[i_], opt[1][i]),
+            do_assign('pd[i_], opt[2][i]),
+            do_assign('pdd[i_], opt[3][i]),
+            gentran(literal(cr))
+        ),
+        gentran("    }", literal(cr))        
+    )
+)$>>
+    }
+    {
+<<block([i, i_, j, j_, opt, K, C, f_, QDD], 
+    ccurrind: 8,
+
+    QDD: transpose(apply(matrix, [states_dd])),
+    f_: ratsimp(M.QDD-transpose(matrix(f))),
+    K: zeromatrix(length(f_), 0),
+    for i: 1 thru length(f_) do (
+        K: addcol(K, diff(f_, states[i]))
+    ),
+    C: zeromatrix(length(f_), 0),
+    for i: 1 thru length(f_) do (
+        C: addcol(C, diff(f_, states_d[i]))
+    ),
+    
+
+    opt: genopt([K, C, flatten(args(Ap)), flatten(args(Apd)), flatten(args(Apdd)), flatten(args(dp_dq)), flatten(args(dp_dp)), flatten(args(dpd_dq)), flatten(args(dpd_dp)), flatten(args(dpdd_dq)), flatten(args(dpdd_dqd)), flatten(args(dpdd_dqdd)), flatten(args(dpdd_dp)), flatten(args(dpdd_dpd))]),
+    gentran(literal(cr)),
+
+    genmat(opt[2], nbrdof, nbrdof, 0, 0, "C", const_matrix_once),
+    gentran(literal(cr)),
+    genmat(opt[1], nbrdof, nbrdof, 0, 0, "K", const_matrix_once),
+    gentran(literal(cr)),
+
+    if nbrdep > 0 then (
+        gentran(literal("        // TODO make class members and write non-constant values only once", cr)),
+
+        gentran(literal("        MatX Ap(nbrdof, nbrdep)\;", cr)),
+        genmat(opt[3], nbrdof, nbrdep, 0, 0, "Ap"),
+        gentran(literal(cr)),
+
+        gentran(literal("        MatX Apd(nbrdof, nbrdep)\;", cr)),
+        genmat(opt[4], nbrdof, nbrdep, 0, 0, "Apd"),
+        gentran(literal(cr)),
+
+        gentran(literal("        MatX Apdd(nbrdof, nbrdep)\;", cr)),
+        genmat(opt[5], nbrdof, nbrdep, 0, 0, "Apdd"),
+        gentran(literal(cr)),
+
+        gentran(literal("        MatX dp_dq(nbrdep, nbrdof)\;", cr)),
+        genmat(opt[6], nbrdep, nbrdof, 0, 0, "dp_dq"),
+        gentran(literal(cr)),
+
+        gentran(literal("        MatX dp_dp(nbrdep, nbrdep)\;", cr)),
+        genmat(opt[7], nbrdep, nbrdep, 0, 0, "dp_dp"),
+        gentran(literal(cr)),
+
+        gentran(literal("        MatX dpd_dq(nbrdep, nbrdof)\;", cr)),
+        genmat(opt[8], nbrdep, nbrdof, 0, 0, "dpd_dq"),
+        gentran(literal(cr)),
+
+        gentran(literal("        MatX dpd_dp(nbrdep, nbrdep)\;", cr)),
+        genmat(opt[9], nbrdep, nbrdof, 0, 0, "dpd_dp"),
+        gentran(literal(cr)),
+
+        gentran(literal("        MatX dpdd_dq(nbrdep, nbrdof)\;", cr)),
+        genmat(opt[10], nbrdep, nbrdof, 0, 0, "dpdd_dq"),
+        gentran(literal(cr)),
+
+        gentran(literal("        MatX dpdd_dqd(nbrdep, nbrdof)\;", cr)),
+        genmat(opt[11], nbrdep, nbrdof, 0, 0, "dpdd_dqd"),
+        gentran(literal(cr)),
+
+        gentran(literal("        MatX dpdd_dqdd(nbrdep, nbrdof)\;", cr)),
+        genmat(opt[12], nbrdep, nbrdof, 0, 0, "dpdd_dqdd"),
+        gentran(literal(cr)),
+
+        gentran(literal("        MatX dpdd_dp(nbrdep, nbrdep)\;", cr)),
+        genmat(opt[13], nbrdep, nbrdep, 0, 0, "dpdd_dp"),
+        gentran(literal(cr)),
+
+        gentran(literal("        MatX dpdd_dpd(nbrdep, nbrdep)\;", cr)),
+        genmat(opt[14], nbrdep, nbrdep, 0, 0, "dpdd_dpd"),
+        gentran(literal(cr)),
+
+        gentran(literal("        dp_dq+= dp_dp*dp_dq\;", cr, cr)),
+
+        gentran(literal("        dpd_dq+= dpd_dp*dp_dq\;", cr)),
+        gentran(literal("        dpd_dq+= dp_dp*dpd_dq\; // dpd_dpd= dp_dp", cr)),
+
+        gentran(literal("        dpdd_dq+= dpdd_dp*dp_dq\;", cr)),
+        gentran(literal("        dpdd_dq+= dpdd_dpd*dpd_dq\;", cr)),
+        gentran(literal("        dpdd_dq+= dp_dp*dpdd_dq\;  // dpdd_dpdd= dp_dp", cr)),
+
+        gentran(literal("        dpdd_dqd+= dpdd_dpd*dp_dq\; // dpd_dqd= dp_dq", cr)),
+        gentran(literal("        dpdd_dqd+= dp_dp*dpdd_dqd\;", cr)),
+
+        gentran(literal("        dpdd_dqdd+= dp_dp*dpdd_dqdd\;", cr, cr)),
+
+        gentran(literal("        K+= Ap*dp_dq + Apd*dpd_dq + Apdd*dpdd_dq\;", cr, cr)),
+        gentran(literal("        C+= Apd*dp_dq + Apdd*dpdd_dqd\;", cr, cr)),
+        gentran(literal("        M+= Apdd*dpdd_dqdd\;", cr, cr))
+    )
+)$>>
+    }
+}
+
+void <<gentran(literal(eval(filename)))$>>::calcB() {
+    {
+<<block([opt, B, f_, QDD], 
+    ccurrind: 8,
+    QDD: transpose(apply(matrix, [states_dd])),
+    f_: ratsimp(M.QDD-transpose(matrix(f))),
+    B: zeromatrix(length(f_), 0),
+    for i: 1 thru length(u) do (
+        B: addcol(B, diff(f_, u[i]))
+    ),
+    
+    opt: genopt([B]),
+    gentran(literal(cr)),
+    
+    genmat(opt[1], nbrdof, nbrin, 0, 0, "B", const_matrix_once)
+)$>>
+    }
+}
+
+void <<gentran(literal(eval(filename)))$>>::calcCDF() {
+    {
+<<block([opt], 
+    ccurrind: 8,
+
+    if const_matrix_once=1 then (    
+        C_no_const: matrixmap(lambda([e], if constantp(e) then 0 else e), C),
+        D_no_const: matrixmap(lambda([e], if constantp(e) then 0 else e), D),
+        F_no_const: matrixmap(lambda([e], if constantp(e) then 0 else e), F)
+    ) else (
+        C_no_const: C,
+        D_no_const: D,
+        F_no_const: F
+    ),        
+    
+    opt: genopt([y, C_no_const, D_no_const, F_no_const]),
+    gentran(literal(cr)),
+    
+    for i:1 thru length(y) do (
+        i_: i-1,
+        do_assign(concat("y[", i_, "]"), opt[1][i])
+    ),
+    
+    gentran(literal(cr)),
+    genmat(opt[2], length(y), 2*nbrdof, 0, 0, "CD", const_matrix_once),
+    gentran(literal(cr)),
+    genmat(opt[3], length(y), nbrin, 0, 0, "CD.block(0, 2*nbrdof, nbrout, nbrin)", const_matrix_once),
+    gentran(literal(cr)),
+    genmat(opt[4], length(y), nbrdof, 0, 0, "F", const_matrix_once)
+)$>>
+    }
+}
+
+void <<gentran(literal(eval(filename)))$>>::calcOut() {
+    {
+<<block([opt], 
+    ccurrind: 8,
+    
+    opt: genopt([y]),
+        
+    for i:1 thru length(y) do (
+        i_: i-1,
+        do_assign(concat("y[", i_, "]"), opt[1][i])
+    )
+)$>>
+    }
+}
+
+<<block([],
+    if length(external) > 0 then (
+        gentran(literal("#include \"", eval(filename), "_Externals.hpp\""))
+    )
+)$>>
+
