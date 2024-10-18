@@ -50,7 +50,10 @@ prepareInput(file):= block([
         )
     ),
     
-    all_TG0_vars: listofvars([listarray(T0G), listarray(TrefG), listarray(elastic_dof)]),
+    all_TG0_vars: listofvars([listarray(T0G), listarray(TrefG)]),
+    if elastic_dof#'elastic_dof then
+        all_TG0_vars: append(all_TG0_vars, listofvars(listarray(elastic_dof))),
+        
     for i:1 thru length(STATES) do (
         if not(member(STATES[i], all_TG0_vars)) then
             warning("State ", string(STATES[i]), " is not used in any tranformation matrix")

@@ -1,3 +1,22 @@
+cagem_gen_matlab(sysdef, [varargs]):= block(
+    file: sysdef@sys_rel@file,
+    filepath: pathname_directory(file),
+    if length(varargs)>0 then (
+        filepath: varargs[1],
+        if slength(filepath)>0 then
+            if notequal(substring (filepath, slength(filepath), slength(filepath)+1),"/") then
+                filepath: sconcat(filepath, "/")
+    ),
+    filename: pathname_name(file),
+
+    out_name: sconcat(filepath, filename, "_matlab_lin.m"),
+    writeMATLAB_linear(sysdef,  out_name),
+    
+    out_name: sconcat(filepath, filename, "_matlab_nonlin.m"),
+    writeMATLAB_nonlinear(sysdef, out_name),
+    done
+);
+
 writeMATLABMat(fid, name, m, subst_list):= block([i, j],
     printf(fid, "~a= [~%", name),
     for i: 1 thru length(m) do (
@@ -23,7 +42,12 @@ writeMATLAB_nonlinear(sys, file):= block([i, fid, f, y],
         subst_list: endcons(sys@params[i]=concat('param\., sys@params[i]), subst_list),
     f: subst(subst_list, sys@f),
     y: subst(subst_list, sys@outputs),
+    pre_calc: subst(subst_list, sys@const_eqns),
     
+    for i:1 thru length(pre_calc) do (
+        printf(fid, "~a= ~a;~%", first(pre_calc[i]), sremove("\\", string(second(pre_calc[i]))))
+    ),
+        
     printf(fid, "f= [~%"),
     for i: 1 thru length(f) do (
         printf(fid, "    ~a~%", (ssubst(")", "]", ssubst("(", "[", sremove("\\", string(f[i]))))))
@@ -33,6 +57,15 @@ writeMATLAB_nonlinear(sys, file):= block([i, fid, f, y],
     printf(fid, "y= [~%"),
     for i: 1 thru length(y) do (
         printf(fid, "    ~a~%", (ssubst(")", "]", ssubst("(", "[", sremove("\\", string(y[i]))))))
+    ),
+    printf(fid, "];~%~%"),
+    
+    
+    printf(fid, "q= ~a;~%", sremove("\\", string(subst(subst_list, sys@cost)))),
+    printf(fid, "p= ~a;~%", sremove("\\", string(subst(subst_list, sys@final_cost)))),
+    printf(fid, "c= [~%"),
+    for i: 1 thru length(sys@constraints) do (
+        printf(fid, "    ~a~%", (ssubst(")", "]", ssubst("(", "[", sremove("\\", string(subst(subst_list, sys@constraints[i])))))))
     ),
     printf(fid, "];~%"),
     
@@ -45,8 +78,13 @@ writeMATLAB_linear(sys, file):= block([i, fid, subst_list],
     subst_list: [],
     for i:1 thru length(sys@params) do
         subst_list: endcons(sys@params[i]=concat('param\., sys@params[i]), subst_list),
-
         
+    pre_calc: subst(subst_list, sys@const_eqns),
+    
+    for i:1 thru length(pre_calc) do (
+        printf(fid, "~a= ~a;~%", first(pre_calc[i]), sremove("\\", string(second(pre_calc[i]))))
+    ),
+    
     if length(sys@f_lin)>0 and length(sys@f_lin@E)>0 then (
         printf(fid, "~%"),
         writeMATLABMat(fid, "E", sys@f_lin@E, subst_list),

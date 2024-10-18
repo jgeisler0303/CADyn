@@ -1,31 +1,4 @@
-
-do_assign(n_work, e_work):= block([],
-    gentran(lrsetq(eval(n_work), scanmap('float, subst(subst_list, e_work))))
-);
-
-genopt(l, temp_name):= block([o, temps, replace_list, i],
-    o: optimize(l),
-
-    if op(o)#'block then
-        return(o),
-        
-    temps: inpart(o, 1),
-
-    pre_replace_list: makelist(temps[i]=concat(temp_name, i), i, 1, length(temps)),
-    replace_list: [],
-    
-    for i: 1 thru length(temps) do (
-        if not(listp(inpart(o, i+1, 2)) or matrixp(inpart(o, i+1, 2))) then (
-            do_assign(concat(temp_name, i), subst(pre_replace_list, inpart(o, i+1, 2))),
-            replace_list: endcons(pre_replace_list[i], replace_list)
-        ) else (
-            replace_list: endcons(inpart(o, i+1, 1)=inpart(o, i+1, 2), replace_list)
-        )
-    ),
-
-    subst(replace_list, subst(replace_list, inpart(o, length(temps)+2)))
-);
-
+load(cagem_gen_util);
 
 cagem_acados_py(sysdef, [varargs]):= block([i, j, i_, j_, file, title, nbrdof, nbrbody, nbrin, nbrdep, external, params, f],
     file: sysdef@sys_rel@file,

@@ -1,0 +1,91 @@
+do_assign(n_work, e_work):= block([],
+    gentran(lrsetq(eval(n_work), scanmap('float, subst(subst_list, e_work))))
+);
+
+genmat(M, n, m, on, om, name, [varargs]):= block([i, j, i_, j_],
+    with_only_consts: 0,
+    if length(varargs)>0 then
+        with_only_consts: varargs[1],
+    
+    for i:1 thru n do (
+        i_: i-1,
+        for j:1 thru m do (
+            j_: j-1,
+            if listp(M) then
+                M_element: M[(on+i-1)*m + om+j]
+            else
+                M_element: M[on+i, om+j],
+                
+            if with_only_consts=0 or (not(constantp(M_element)) and with_only_consts=1) or (constantp(M_element) and with_only_consts=2) then
+                do_assign(concat(name, "(", i_, ", ", j_, ")"), M_element)
+        )
+    )    
+);
+
+genvec(V, n, on, name, [varargs]):= block([i, i_, V_element],
+    with_only_consts: 0,
+    if length(varargs)>0 then
+        with_only_consts: varargs[1],
+    
+    for i:1 thru n do (
+        i_: i-1,
+        if listp(V) then
+            V_element: V[on+i]
+        else
+            if length(V[1])>1 then
+                V_element: V[1, on+i]
+            else
+                V_element: V[on+i, 1],
+            
+        if with_only_consts=0 or (not(constantp(V_element)) and with_only_consts=1) or (constantp(V_element) and with_only_consts=2) then
+            do_assign(concat(name, "[", i_, "]"), V_element)
+    )    
+);
+
+make_c_index(v, nbrdof, nbrdep):= block([v_, j, j_],
+    v_: v,
+
+    for j:1 thru nbrdof do (
+        j_: j-1,
+        
+        v_: subst(qdd[j_], qdd[j], v_),
+        v_: subst(qd[j_], qd[j], v_),
+        v_: subst(q[j_], q[j], v_)
+    ),
+    
+    for j:1 thru nbrdep do (
+        j_: j-1,
+        
+        v_: subst(pdd[j_], pdd[j], v_),
+        v_: subst(pd[j_], pd[j], v_),
+        v_: subst(p[j_], p[j], v_)
+    ),
+    
+    v_
+);
+
+genopt(l):= block([o, temps, replace_list, i],
+    o: optimize(l),
+
+    if op(o)#'block then
+        return(o),
+        
+    temps: inpart(o, 1),
+
+    pre_replace_list: makelist(temps[i]=concat(temp, i), i, 1, length(temps)),
+    replace_list: [],
+    indent_str: smake(ccurrind, " "),
+    
+    for i: 1 thru length(temps) do (
+        if not(listp(inpart(o, i+1, 2)) or matrixp(inpart(o, i+1, 2))) then (
+            gentran(literal(eval(indent_str), "real_type ")),
+                
+            do_assign(concat(temp, i), subst(pre_replace_list, inpart(o, i+1, 2))),
+            replace_list: endcons(pre_replace_list[i], replace_list)
+        ) else (
+            replace_list: endcons(inpart(o, i+1, 1)=inpart(o, i+1, 2), replace_list)
+        )
+    ),
+
+    subst(replace_list, subst(replace_list, inpart(o, length(temps)+2)))
+);
