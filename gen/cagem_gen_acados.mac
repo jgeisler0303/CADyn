@@ -13,7 +13,7 @@ cagem_gen_acados(sysdef, [varargs]):= block([i, j, i_, j_, file, title, nbrdof, 
     u: sysdef@sys_rel@u,
     y: sysdef@outputs,
     external: sysdef@sys_rel@external,
-    params: append(sysdef@params, sysdef@sys_rel@ext_param),
+    params: sysdef@all_params,
 
     f: sysdef@f,
     
@@ -64,7 +64,9 @@ cagem_gen_acados(sysdef, [varargs]):= block([i, j, i_, j_, file, title, nbrdof, 
         subst_list: [],
         for i:1 thru length(sysdef@params) do
             subst_list: endcons(sysdef@params[i]=concat('param\., sysdef@params[i]), subst_list),
-    
+        for i:1 thru length(pre_calc_const) do
+            subst_list: endcons(first(pre_calc_const[i])=concat('param\., first(pre_calc_const[i])), subst_list),
+
         out_name: sconcat(filepath, filename, "_pre_calc.m"),
         if file_search(out_name)#false then delete_file(out_name),
         templ_name: ssubst("cadyn_acados_pre_calc.m.tem", "cagem.mac", cagem_dir),

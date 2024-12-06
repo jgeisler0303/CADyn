@@ -36,7 +36,9 @@ cagem(file, [varargs]):= block([output, i, appliedF, appliedM, appliedFe, T0G, a
             output@params: listify(subset(setify(listofvars(all_vars)), lambda([x], not(member(x, output@sys_rel@states) or member(x, output@sys_rel@states_d) or member(x, output@sys_rel@states_dd) or member(x, output@sys_rel@u) or member(x, output@sys_rel@external) or member(x, output@sys_rel@d_external) or x=t)))),
 
             apply(declare, [output@params, constant]),
-  
+            
+            output@all_params: listify(setify([output@params, output@sys_rel@ext_param])),
+            
             return(output)
         )
     ),
@@ -120,7 +122,8 @@ cagem(file, [varargs]):= block([output, i, appliedF, appliedM, appliedFe, T0G, a
 
     apply(declare, [output@params, constant]),
     
-        
+    output@all_params: listify(setify(append(output@params, output@sys_rel@ext_param))),
+    
     output@const_eqns: [],
     /* reduce_consts seems to be broken, when constants are squared */
     /* fix in expense.lisp

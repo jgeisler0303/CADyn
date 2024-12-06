@@ -11,8 +11,6 @@ nu = <<gentran(literal(eval(nbrin)))$>>;
 ny = <<gentran(literal(eval(length(y))))$>>;
 
 % system parameters
-model.name= mfilename;
-
 stateName= {
 <<block([i], 
     for i:1 thru nbrdof do
@@ -21,7 +19,7 @@ stateName= {
         else
             gentran(literal("    '", eval(states[i]), "'", cr))
 )$>>};
-makeCasADiNamedVector('q', stateName, model, 1, 0);
+makeCasADiNamedVector('q', stateName, [], 1, 0);
 
 dstateName= {
 <<block([i], 
@@ -31,7 +29,7 @@ dstateName= {
         else
             gentran(literal("    '", eval(states[i]), "_d'", cr))
 )$>>};
-makeCasADiNamedVector('qd', dstateName, model, 1, 0);
+makeCasADiNamedVector('qd', dstateName, [], 1, 0);
 
 ddstateName= {
 <<block([i], 
@@ -41,12 +39,12 @@ ddstateName= {
         else
             gentran(literal("    '", eval(states[i]), "_dd'", cr))
 )$>>};
-makeCasADiNamedVector('qdd', ddstateName, model, 1, 0);
+makeCasADiNamedVector('qdd', ddstateName, [], 1, 0);
 
 sym_x= [q; qd];
 
 dstateName_= strcat('dot', stateName);
-makeCasADiNamedVector('xdot1', dstateName_, model, 1, 0);
+makeCasADiNamedVector('xdot1', dstateName_, [], 1, 0);
 sym_xdot= [xdot1; qdd];
 
 inputName= cell(nu, 1);
@@ -56,10 +54,10 @@ inputName= cell(nu, 1);
             do_assign(concat("inputName{", i, "}"), concat("'", u[i], "'"))
         )
 )$>>
-makeCasADiNamedVector('sym_u', inputName, model, 1, 0);
+makeCasADiNamedVector('sym_u', inputName, [], 1, 0);
 u= sym_u;
 
-makeCasADiNamedVector('sym_z', {}, model, 1, 0);
+% makeCasADiNamedVector('sym_z', {}, [], 1, 0);
 
 % Parameters
 paramName= struct();
@@ -78,7 +76,7 @@ paramName= struct();
     for i:1 thru length(pre_calc_const) do
         gentran(literal("paramName.", eval(first(pre_calc_const[i])), "= 1\;", cr))
 )$>>
-makeCasADiNamedVector('sym_p', paramName, model, 1, 0);
+makeCasADiNamedVector('sym_p', paramName, [], 1, 0);
 
 
 % external equations
@@ -87,7 +85,7 @@ externalNames= {
     for i:1 thru length(external) do
         gentran(literal("    '", eval(external[i]), "'", cr))
 )$>>};
-makeCasADiNamedVector('externals', externalNames, model, 1, 0);
+makeCasADiNamedVector('externals', externalNames, [], 1, 0);
         
 <<block([i], 
     if length(external) > 0 then (
@@ -142,15 +140,13 @@ f_impl_expr = [xdot1 - qd; f];
 
 
 % populate structure
-model.nx = nx;
-model.nu = nu;
-model.sym_u = sym_u;
-model.sym_z = sym_z;
-model.sym_x = sym_x;
-model.sym_xdot = sym_xdot;
-model.sym_p = sym_p;
-model.y = sym_y;
-model.expr_f_impl = f_impl_expr;
+model = AcadosModel();
+model.name= mfilename;
+model.u = sym_u;
+model.x = sym_x;
+model.xdot = sym_xdot;
+model.p = sym_p;
+model.f_impl_expr = f_impl_expr;
 
 end
 

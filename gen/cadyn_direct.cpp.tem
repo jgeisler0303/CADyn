@@ -9,6 +9,7 @@
 #include <chrono>
 #include <cstdio>
 #include <ctime>
+#include <array>
 
 #include "NewmarkBeta.hpp"
 

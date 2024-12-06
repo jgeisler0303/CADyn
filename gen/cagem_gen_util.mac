@@ -64,11 +64,14 @@ make_c_index(v, nbrdof, nbrdep):= block([v_, j, j_],
     v_
 );
 
-genopt(l):= block([o, temps, replace_list, i],
+genopt(l, [varargs]):= block([o, temps, replace_list, i],
     o: optimize(l),
 
     if op(o)#'block then
         return(o),
+        
+    if length(varargs)>0 then
+        temp: varargs[1],
         
     temps: inpart(o, 1),
 
@@ -78,7 +81,8 @@ genopt(l):= block([o, temps, replace_list, i],
     
     for i: 1 thru length(temps) do (
         if not(listp(inpart(o, i+1, 2)) or matrixp(inpart(o, i+1, 2))) then (
-            gentran(literal(eval(indent_str), "real_type ")),
+            if length(varargs)=0 then
+                gentran(literal(eval(indent_str), "real_type ")),
                 
             do_assign(concat(temp, i), subst(pre_replace_list, inpart(o, i+1, 2))),
             replace_list: endcons(pre_replace_list[i], replace_list)

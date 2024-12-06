@@ -59,6 +59,7 @@ public:
 
     typedef real_type_ real_type;
     typedef Eigen::Matrix<real_type, nbrdof_, 1> VecQ;
+    typedef Eigen::Matrix<real_type, 2*nbrdof_, 1> VecX;
     typedef Eigen::Matrix<real_type, nbrin_, 1> VecI;
     typedef Eigen::Matrix<real_type, nbrout_, 1> VecO; 
     typedef Eigen::Matrix<real_type, nbrdof_, nbrdof_> MatQ;
@@ -83,10 +84,9 @@ public:
     void staticEquilibriumWithLin();
     int newmarkOneStep(real_type h, bool hmodified= true);
     void newmarkInterval(real_type tfinal, real_type &h, real_type hmax);
+    void newmarkSensitivities(real_type ts);
     void newmarkIntervalWithSens(real_type ts) { return newmarkIntervalWithSens(ts, ts); };
     void newmarkIntervalWithSens(real_type ts, real_type h);
-    void newmarkIntervalWithSens_restart(real_type ts) { return newmarkIntervalWithSens_restart(ts, ts); };
-    void newmarkIntervalWithSens_restart(real_type ts, real_type h);
     void newmarkIntegration(real_type tfinal, real_type hsave, real_type hmax, AbstractIntegratorVisitor *visitor= nullptr);
     void setOptionsFromFile(const std::string &fileName);
 
@@ -106,7 +106,9 @@ public:
     Eigen::FullPivLU<MatQ> LU;
     MatS S;
     
-    VecQ q, qd, qdd;
+    VecX x;
+    Eigen::Map<VecQ> q, qd;
+    VecQ qdd;
     VecQ f;
     
     std::array<bool, nbrdof_> doflocked;
@@ -130,17 +132,14 @@ public:
     real_type errq;
 };
 
-// template <int nbrdof_, int nbrin_, int nbrout_, class real_type_> const int NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_>::nbrdof= nbrdof_;
-// template <int nbrdof_, int nbrin_, int nbrout_, class real_type_> const int NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_>::nbrin= nbrin_;
-// template <int nbrdof_, int nbrin_, int nbrout_, class real_type_> const int NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_>::nbrout= nbrout_;
-
 template <int nbrdof_, int nbrin_, int nbrout_, class real_type_>
 NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_>::NewmarkBeta(const std::string &aname, const std::string &adesc):
         name(aname),
-        description(adesc)
+        description(adesc),
+        q(x.data()),
+        qd(x.data()+nbrdof_)
     {
-        q.setZero();
-        qd.setZero();
+        x.setZero();
         qdd.setZero();
         doflocked.fill(false);
         u.setZero();
@@ -297,6 +296,8 @@ void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_>::staticEquilibrium() {
         if((nstep%10)==1) {
             calcJacobian(100.0, 0.0, 1.0);
             LU.compute(Jacobian);
+            if(!LU.isInvertible())
+                throw NewmarkBetaException("Static equilibrium calculation: Jacobian is not invertible.");
         } else
             f= computeResidualsInt();
 
@@ -349,6 +350,8 @@ int NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_>::newmarkOneStep(real_type 
         if((nstep%jac_recalc_step)==istepjac) {
             calcJacobian(1.0, Gamma*h, Beta*h*h);
             LU.compute(Jacobian);
+            if(!LU.isInvertible())
+                throw NewmarkBetaException("Step calculation: Jacobian is not invertible.");
         } else
             f= computeResidualsInt();
 
@@ -437,122 +440,17 @@ void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_>::newmarkInterval(real_typ
     }
 }
 
-template <int nbrdof_, int nbrin_, int nbrout_, class real_type>
-void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::newmarkIntervalWithSens_restart(real_type ts, real_type h) {
-    bool hchanged= true;
-    bool first_run= true;
-    n_steps= 0;
-    n_sub_steps= 0;
-    n_back_steps= 0;
-    real_type tfinal= t+ts;
-    
-    Mat2Q PG_Pddxn_ddxn1;
-    MatS PG_Pxn_dxn_u;
-    
-    if(!is_finite(q) || !is_finite(qd) || !is_finite(qdd) || !is_finite(u))
-        throw NewmarkBetaException("Interval calculation: initial values of q, qd, qdd, u are not finite.");
-    
-    newmarkOneStep(0.0);
-    
-    while(t < tfinal) {
-        if((t+1.4*h) >= tfinal) {
-            h= tfinal-t;
-            hchanged= true;
-        }
-        real_type timesto= t;
-
-        VecQ q_sto= q;
-        VecQ qd_sto= qd;
-        VecQ qdd_sto= qdd;
-        
-        if(first_run) {
-            calcJacobian(1.0, Gamma*h, Beta*h*h);
-            calcB();
-            calcCDF();
-            PG_Pddxn_ddxn1.block(0, 0, nbrdof_, nbrdof_)= M;
-            PG_Pxn_dxn_u.block(0, nbrdof_, nbrdof_, nbrdof_)= C;
-            PG_Pxn_dxn_u.block(0, 0, nbrdof_, nbrdof_)= K;
-            PG_Pxn_dxn_u.block(0, 2*nbrdof_, nbrdof_, nbrin_)= B;
-            
-            LU.compute(Jacobian);
-            hchanged= false;
-            first_run= false;
-        }
-        int code= newmarkOneStep(h, hchanged);
-        n_steps++;
-        hchanged= false;
-
-        if((code) || (errq>AbsTol))    {
-            if((code==1) || (code==2) || !std::isfinite(errq))
-                h*= 0.25;
-            else
-                h*= sqrt((0.21*AbsTol + 0.04*errq) / errq);
-            hchanged= true;
-            t= timesto;
-
-            q= q_sto;
-            qd= qd_sto;
-            qdd= qdd_sto;
-            if(h<hminmin)
-                throw NewmarkBetaException("Interval calculation: dynamic step size too small.");
-            
-            n_back_steps++;
-        } else {
-            if((errq < (0.1*AbsTol)) && (h<ts)) {
-                h*= sqrt(AbsTol/(2.1*errq + 0.04*AbsTol));
-                if(h>ts) h= ts;
-                hchanged= true;
-            }
-        }
-    }
-    
-    calcJacobian(0.0, 0.0, 0.0);
-    calcB();
-    
-    PG_Pxn_dxn_u.block(nbrdof_, 0, nbrdof_, nbrdof_)= K;
-    PG_Pxn_dxn_u.block(nbrdof_, nbrdof_, nbrdof_, nbrdof_)= C + ts*K;
-    PG_Pxn_dxn_u.block(nbrdof_, 2*nbrdof_, nbrdof_, nbrin_)= B;
-    
-    PG_Pddxn_ddxn1.block(nbrdof_, 0, nbrdof_, nbrdof_)= ts*(1.0-Gamma)*C + ts*ts*(0.5-Beta)*K;
-    PG_Pddxn_ddxn1.block(0, nbrdof_, nbrdof_, nbrdof_)= MatQ::Zero();
-    PG_Pddxn_ddxn1.block(nbrdof_, nbrdof_, nbrdof_, nbrdof_)= M + ts*Gamma*C + ts*ts*Beta*K;
-    
-    Eigen::ColPivHouseholderQR<Mat2Q> invPG_Pddxn_ddxn1(PG_Pddxn_ddxn1);
-    // alternative: compute inverse via schure complement
-    
-    MatS Pddx_Pxn_dxn= -invPG_Pddxn_ddxn1.solve(PG_Pxn_dxn_u);
-    
-    #define Pddxn_Pxn   Pddx_Pxn_dxn.block(0, 0, nbrdof_, nbrdof_)
-    #define Pddxn1_Pxn  Pddx_Pxn_dxn.block(nbrdof_, 0, nbrdof_, nbrdof_)
-    #define Pddxn_Pdxn  Pddx_Pxn_dxn.block(0, nbrdof_, nbrdof_, nbrdof_)
-    #define Pddxn1_Pdxn Pddx_Pxn_dxn.block(nbrdof_, nbrdof_, nbrdof_, nbrdof_)
-    #define Pddxn_Pu  Pddx_Pxn_dxn.block(0, 2*nbrdof_, nbrdof_, nbrin_)
-    #define Pddxn1_Pu Pddx_Pxn_dxn.block(nbrdof_, 2*nbrdof_, nbrdof_, nbrin_)
-    
-    // MatX Pxn1_Pxn
-    S.block(0, 0, nbrdof_, nbrdof_)= MatQ::Identity() + ts*ts*((0.5-Beta)*Pddxn_Pxn + Beta*Pddxn1_Pxn);
-    // MatX Pxn1_Pdxn
-    S.block(0, nbrdof_, nbrdof_, nbrdof_)= ts*MatQ::Identity() + ts*ts*((0.5-Beta)*Pddxn_Pdxn + Beta*Pddxn1_Pdxn);
-    // MatX Pdxn1_Pxn
-    S.block(nbrdof_, 0, nbrdof_, nbrdof_)= ts*((1.0-Gamma)*Pddxn_Pxn + Gamma*Pddxn1_Pxn);
-    // MatX Pdxn1_Pdxn
-    S.block(nbrdof_, nbrdof_, nbrdof_, nbrdof_)= MatQ::Identity() + ts*((1.0-Gamma)*Pddxn_Pdxn + Gamma*Pddxn1_Pdxn);
-
-    S.block(0, 2*nbrdof_, nbrdof_, nbrin_)= ts*ts*((0.5-Beta)*Pddxn_Pu + Beta*Pddxn1_Pu);
-    S.block(nbrdof_, 2*nbrdof_, nbrdof_, nbrin_)= ts*((1.0-Gamma)*Pddxn_Pu + Gamma*Pddxn1_Pu);
-    
-    CD.block(0, 0, nbrout_, nbrdof_)+= F*Pddxn1_Pxn; // TODO: really ddxn_1_ ?
-    CD.block(0, nbrdof_, nbrout_, nbrdof_)+= F*Pddxn1_Pdxn;
-    CD.block(0, 2*nbrdof_, nbrout_, nbrin_)+= F*Pddxn1_Pu;
-}
-
 template <int nbrdof_, int nbrin_, int nbrout_, class real_type_>
 void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_>::newmarkIntervalWithSens(real_type ts, real_type h) {
     newmarkInterval(t+ts, h, ts);
-    
+    newmarkSensitivities(ts);
+}
+
+template <int nbrdof_, int nbrin_, int nbrout_, class real_type>
+void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type>::newmarkSensitivities(real_type ts) {
     // calculate pfk1_pqdd, pfk1_pqd, pfk1_pq (M, C, K), does not work with base class
     // TODO: maybe reuse Jacobian for next step or from last
-    calcJacobian(1.0, Gamma*h, Beta*h*h);
+    calcJacobian(1.0, Gamma*ts, Beta*ts*ts);
     calcB();
     calcCDF();
     
@@ -560,6 +458,8 @@ void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_>::newmarkIntervalWithSens(
     
     // pfk1_pqddk1= Jacobian
     LU.compute(Jacobian);
+    if(!LU.isInvertible())
+        throw NewmarkBetaException("Sensitivities calculation: Jacobian is not invertible.");
     
     MatQ pqddk1_pqk= -LU.solve(K);
     MatQ pqddk1_pqdk= -LU.solve(pfk1_pqdk);

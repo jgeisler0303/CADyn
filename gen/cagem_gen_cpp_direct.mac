@@ -17,7 +17,7 @@ cagem_gen_cpp_direct(sysdef, [varargs]):= block([i, j, i_, j_, file, title, nbrd
     y: make_c_index(sysdef@outputs, nbrdof, nbrdep),
     external: sysdef@sys_rel@external,
     d_external: sysdef@sys_rel@d_external,
-    params: append(sysdef@params, sysdef@sys_rel@ext_param),
+    params: sysdef@all_params,
     qi: sysdef@sys_abs@qi,
     qdi: sysdef@sys_abs@qdi,
     FinalTime: sysdef@sys_abs@FinalTime,

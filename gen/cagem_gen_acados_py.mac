@@ -14,7 +14,7 @@ cagem_acados_py(sysdef, [varargs]):= block([i, j, i_, j_, file, title, nbrdof, n
     states_dd: sysdef@sys_rel@states_dd,
     y: sysdef@outputs,
     external: sysdef@sys_rel@external,
-    params: append(sysdef@params, sysdef@sys_rel@ext_param),
+    params: sysdef@all_params,
 
     f: sysdef@f,
     

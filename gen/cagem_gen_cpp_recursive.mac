@@ -29,7 +29,7 @@ cagem_gen_cpp_recursive(sysdef, [varargs]):= block([i, j, i_, j_, file, title, n
     states_dd: sysdef@sys_rel@states_dd,
     y: make_c_index(sysdef@outputs, nbrdof, nbrdep),
     external: sysdef@sys_rel@external,
-    params: listify(append(sysdef@params, sysdef@sys_rel@ext_param)),
+    params: sysdef@all_params,
     pi: make_c_index(sysdef@sys_rel@pi, nbrdof, nbrdep),
     pdi: make_c_index(sysdef@sys_rel@pdi, nbrdof, nbrdep),
     pddi: make_c_index(sysdef@sys_rel@pddi, nbrdof, nbrdep),
