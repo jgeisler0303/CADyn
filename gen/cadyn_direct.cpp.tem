@@ -377,6 +377,8 @@ void <<gentran(literal(eval(filename)))$>>::calcJacobian(real_type alphaM, real_
         if(doflocked[idof]) {
             f[idof]= 0.0;
             Jacobian.col(idof).setZero();
+            Jacobian.row(idof).setZero();
+            Jacobian(idof, idof)= 1.0;
         }
     }
 }

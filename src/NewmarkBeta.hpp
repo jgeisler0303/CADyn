@@ -207,8 +207,10 @@ void NewmarkBeta<nbrdof_, nbrin_, nbrout_, real_type_>::calcJacobian(real_type a
         if(!doflocked[jddl]) {
             foff= computeResidualsInt();
             Jacobian.col(jddl)= (foff - f)/jac_fd_tol;
-        } else
+        } else {
             Jacobian.col(jddl).setZero();
+            Jacobian(jddl, jddl)= 1.0;
+        }
 
         q[jddl]= q_;
         qd[jddl]= qd_;

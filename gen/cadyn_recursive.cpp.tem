@@ -506,9 +506,12 @@ void <<gentran(literal(eval(filename)))$>>::calcJacobian(real_type alphaM, real_
                 if(doflocked[idof]) d_f[idof]= 0.0;
             
             Jacobian.col(jddl)= dpart(d_f);
-        } else
+        } else {
             Jacobian.col(jddl).setZero();
-
+            Jacobian.row(jddl).setZero();
+            Jacobian(idof, idof)= 1.0;
+        }
+        
         d_q[jddl].dpart(0.0);
         d_qd[jddl].dpart(0.0);
         d_qdd[jddl].dpart(0.0);
