@@ -9,7 +9,7 @@
 #include <chrono>
 #include <cstdio>
 #include <ctime>
-
+#include <array>
 
 typedef double real_type;
 
@@ -49,9 +49,9 @@ public:
     <<gentran(literal(eval(filename), "Parameters"))$>> param;
     
 // private:
-    static const int nbrdof = <<gentran(literal(eval(nbrdof)))$>>;
-    static const int nbrout = <<gentran(literal(eval(nbrout)))$>>;
-    static const int nbrin = <<gentran(literal(eval(nbrin)))$>>;
+    static constexpr int nbrdof = <<gentran(literal(eval(nbrdof)))$>>;
+    static constexpr int nbrout = <<gentran(literal(eval(nbrout)))$>>;
+    static constexpr int nbrin = <<gentran(literal(eval(nbrin)))$>>;
     std::array<std::string, nbrdof> state_name;
     std::array<std::string, nbrin> in_name;
     VecQ f;
