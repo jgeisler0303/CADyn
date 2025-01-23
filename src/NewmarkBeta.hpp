@@ -15,6 +15,7 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <array>
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 

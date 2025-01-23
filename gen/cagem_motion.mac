@@ -20,12 +20,12 @@ composeMotion(sysdef):= block([erel, vrel, vrel_z, arel, wrel, wrel_z, wdrel, vG
         sysout@omegapartial_z[i]: omegapartial_z,
         
         if numberp(sysout@BodyRef[i]) then (
-            rotationToGlobal: simplify_(submatrix(4, sysout@T0G[sysout@BodyRef[i]], 4),
-            erel: rotationToGlobal . submatrix(4, sysout@T0G[i], 1, 2, 3)),
-            vrel: rotationToGlobal . sysout@vG[i]),
-            arel: rotationToGlobal . sysout@aG[i]),
-            wrel: rotationToGlobal . sysout@omega[i]),
-            wdrel: rotationToGlobal . sysout@omegad[i]),
+            rotationToGlobal: simplify_(submatrix(4, sysout@T0G[sysout@BodyRef[i]], 4)),
+            erel: rotationToGlobal . submatrix(4, sysout@T0G[i], 1, 2, 3),
+            vrel: rotationToGlobal . sysout@vG[i],
+            arel: rotationToGlobal . sysout@aG[i],
+            wrel: rotationToGlobal . sysout@omega[i],
+            wdrel: rotationToGlobal . sysout@omegad[i],
 
             sysout@T0G[i]: simplify(sysout@T0G[sysout@BodyRef[i]] . sysout@T0G[i]),
             sysout@vG[i]: simplify(sysout@vG[sysout@BodyRef[i]] + crossmat(sysout@omega[sysout@BodyRef[i]]) . erel + vrel),
@@ -38,8 +38,8 @@ composeMotion(sysdef):= block([erel, vrel, vrel_z, arel, wrel, wrel_z, wdrel, vG
             vGpartial_z: zeromatrix(3, 0),
             omegapartial_z: zeromatrix(3, 0),
             for j: 1 thru sysout@nbrdof do (
-                vrel: rotationToGlobal . col(sysout@vGpartial[i], j)),
-                wrel: rotationToGlobal . col(sysout@omegapartial[i], j)),
+                vrel: rotationToGlobal . col(sysout@vGpartial[i], j),
+                wrel: rotationToGlobal . col(sysout@omegapartial[i], j),
                 vGpartial: simplify_(addcol(vGpartial, col(sysout@vGpartial[sysout@BodyRef[i]], j) + crossmat(col(sysout@omegapartial[sysout@BodyRef[i]], j)) . erel + vrel)),
                 omegapartial: simplify_(addcol(omegapartial, col(sysout@omegapartial[sysout@BodyRef[i]], j) + wrel))
             ),
@@ -47,8 +47,8 @@ composeMotion(sysdef):= block([erel, vrel, vrel_z, arel, wrel, wrel_z, wdrel, vG
             sysout@omegapartial[i]: simplify(subst([eps=1], omegapartial)),
             
             for j: 1 thru sysout@nbrcon do (
-                vrel_z: rotationToGlobal . col(sysout@vGpartial_z[i], j)),
-                wrel_z: rotationToGlobal . col(sysout@omegapartial_z[i], j)),
+                vrel_z: rotationToGlobal . col(sysout@vGpartial_z[i], j),
+                wrel_z: rotationToGlobal . col(sysout@omegapartial_z[i], j),
                 vGpartial_z: simplify_(addcol(vGpartial_z, col(sysout@vGpartial_z[sysout@BodyRef[i]], j) + crossmat(col(sysout@omegapartial_z[sysout@BodyRef[i]], j)) . erel + vrel_z)),
                 omegapartial_z: simplify_(addcol(omegapartial_z, col(sysout@omegapartial_z[sysout@BodyRef[i]], j) + wrel_z))
             ),
