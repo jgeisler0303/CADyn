@@ -63,7 +63,28 @@ public:
         gentran(literal("        real_type &", eval(u[i]), "\;", cr))
     ),            
     gentran(literal("    } inputs\;", cr)),
-        
+
+    gentran(literal(cr)),
+    gentran(literal("    struct outputs_t {", cr)),
+    gentran(literal("    public:", cr)),
+    gentran(literal("        outputs_t(")),
+    for i:1 thru nbrout do (
+        gentran(literal("real_type &", eval(output_names[i]))),
+        if i#nbrout then
+            gentran(literal(", "))
+    ),            
+    gentran(literal(") : ")),
+    for i:1 thru nbrout do (
+        gentran(literal(eval(output_names[i]), "(", eval(output_names[i]), ")")),
+        if i#nbrout then
+            gentran(literal(", "))
+    ),            
+    gentran(literal(" {}\;", cr, cr)),
+    for i:1 thru nbrout do (
+        gentran(literal("        real_type &", eval(output_names[i]), "\;", cr))
+    ),            
+    gentran(literal("    } outputs\;", cr)),
+
     if default_states=0 then (
         gentran(literal(cr, "    struct states_t {", cr)),
         gentran(literal("    public:", cr)),
@@ -134,13 +155,21 @@ const <<gentran(literal(eval(filename)))$>>::outputs_idx_type <<gentran(literal(
     NewmarkBeta("<<gentran(literal(eval(filename)))$>>", "<<gentran(literal(eval(title)))$>>"),
     param(),
 <<block([i],
-    gentran(literal("    inputs(")),
+        gentran(literal("    inputs(")),
     for i:1 thru nbrin do (
         gentran(literal("u.data()[", eval(i-1), "]")),
         if i#nbrin then
             gentran(literal(", "))
+    ),
+    gentran(literal("),", cr)),
+    
+    gentran(literal("    outputs(")),
+    for i:1 thru nbrout do (
+        gentran(literal("y.data()[", eval(i-1), "]")),
+        if i#nbrout then
+            gentran(literal(", "))
     ),            
-                    
+    
     if default_states=0 then (
         gentran(literal("),", cr, "    states(")),
         for i:1 thru nbrdof do (
