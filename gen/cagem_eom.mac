@@ -4,67 +4,86 @@ computeForceBalance(sysdef):= block([R, MG, PhiG_local, aG_local, omegad_local, 
         eps: 1,
     
     for i: 1 thru sysdef@nbrbody do (
-        if sysout@ebody[i] = ebody[i] then (
-            R[i]: simplify_(sysdef@mass[i] * (sysdef@gravity - sysdef@aG[i])),
-
-            PhiG_local: simplify_(submatrix(4, sysdef@T0G[i], 4) . sysdef@IG[i] . transpose(submatrix(4, sysdef@T0G[i], 4))),
-            MG[i]: simplify_(-PhiG_local . sysdef@omegad[i] - crossmat(sysdef@omega[i]) . (PhiG_local . sysdef@omega[i])),
-            Re[i]: []
-        ) else (
-            Re[i]: zeromatrix(length(sysout@elastic_dof_idx[i]), 1),
-            aG_local: simplify_(transpose(submatrix(4, sysdef@T0G[i], 4)) . sysdef@aG[i]),
-            omegad_local: simplify_(transpose(submatrix(4, sysdef@T0G[i], 4)) . sysdef@omegad[i]),
-            omega_local: simplify_(transpose(submatrix(4, sysdef@T0G[i], 4)) . sysdef@omega[i]),
-
-            R_local: simplify_(- sysdef@ebody[i]@refmod@mass * aG_local),
-            R_local: simplify_(R_local - crossmat(omegad_local) . evalModalTaylor(sysdef@ebody[i]@md, sysdef@elastic_dof_idx[i], sysdef@states, eps)),
-            Ct: evalModalTaylor(sysdef@ebody[i]@Ct, sysdef@elastic_dof_idx[i], sysdef@states, eps),
-            for iedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
-                R_local: R_local - transpose(row(Ct, iedof)) * sysdef@states_dd[sysout@elastic_dof_idx[i][iedof]]*eps
-            ),
+        rotationToGlobal: submatrix(4, sysdef@T0G[i], 4),
+        rotationToLocal: transpose(rotationToGlobal),
+        
+        if sysout@ebody[i] # ebody[i] then
+            R[i]: sysdef@ebody[i]@refmod@mass * (sysdef@gravity - sysdef@aG[i])
+        else
+            R[i]: sysdef@mass[i] * (sysdef@gravity - sysdef@aG[i]),
+        
+        if sysout@ebody[i] # ebody[i] then (
+            md_global: rotationToGlobal . evalModalTaylor(sysdef@ebody[i]@md, sysdef@elastic_dof_idx[i], sysdef@states, eps),
+            R[i]: R[i] - crossmat(sysdef@omegad[i]) . md_global,
+            R[i]: R[i] - crossmat(sysdef@omega[i]) . (crossmat(sysdef@omega[i]) . md_global),
             
-            MG_local: simplify_(- evalModalTaylor(sysdef@ebody[i]@I, sysdef@elastic_dof_idx[i], sysdef@states, eps) . omegad_local),
-            MG_local: simplify_(MG_local - crossmat(evalModalTaylor(sysdef@ebody[i]@md, sysdef@elastic_dof_idx[i], sysdef@states, eps)) . aG_local),
-            Cr: evalModalTaylor(sysdef@ebody[i]@Cr, sysdef@elastic_dof_idx[i], sysdef@states, eps),
+            Ct: evalModalTaylor(sysdef@ebody[i]@Ct, sysdef@elastic_dof_idx[i], sysdef@states, eps),
+            Ct_d: zeromatrix(3, 1),
+            Ct_dd: zeromatrix(3, 1),
             for iedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
-                MG_local: MG_local - transpose(row(Cr, iedof)) * sysdef@states_dd[sysout@elastic_dof_idx[i][iedof]]*eps
+                Ct_d: Ct_d + transpose(row(Ct, iedof)) * sysdef@states_d[sysout@elastic_dof_idx[i][iedof]]*eps,
+                Ct_dd: Ct_dd + transpose(row(Ct, iedof)) * sysdef@states_dd[sysout@elastic_dof_idx[i][iedof]]*eps
             ),
-            for iedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
-                Re[i][iedof, 1]: simplify_(- row(Ct, iedof) . aG_local),
-                Re[i][iedof, 1]: simplify_(Re[i][iedof, 1] - row(Cr, iedof) . omegad_local),
-                for jedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
-                    Re[i][iedof, 1]: simplify_(Re[i][iedof, 1] - sysdef@ebody[i]@Me@M0[iedof, jedof] * sysdef@states_dd[sysout@elastic_dof_idx[i][jedof]]*eps)
-                )
-            ),
-            /* R_local: R_local - simplify_(sysdef@ebody[i]@refmod@mass * crossmat(omega_local) . vG_local), */
-            R_local: R_local - simplify_(crossmat(omega_local) . (crossmat(omega_local) . evalModalTaylor(sysdef@ebody[i]@md, sysdef@elastic_dof_idx[i], sysdef@states, eps))),
-            Ct_: zeromatrix(3, 1),
-            for iedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
-                Ct_: Ct_ + transpose(row(Ct, iedof)) * sysdef@states_d[sysout@elastic_dof_idx[i][iedof]]*eps
-            ),
-            R_local: R_local - simplify_(2 * crossmat(omega_local) . Ct_),
+            R[i]: R[i] -   2 * crossmat(sysdef@omega[i]) . rotationToGlobal . Ct_d,
+            R[i]: R[i] - rotationToGlobal . Ct_dd
+        ),
 
-            /* MG_local: MG_local - simplify_(crossmat(evalModalTaylor(sysdef@ebody[i]@md, sysdef@elastic_dof_idx[i], sysdef@states, eps)) . crossmat(omega_local) . vG_local), */
-            MG_local: MG_local - simplify_(crossmat(omega_local) . (evalModalTaylor(sysdef@ebody[i]@I, sysdef@elastic_dof_idx[i], sysdef@states, eps) . omega_local)),
-            Gr_: zeromatrix(3, 3),
+        if sysout@ebody[i] = ebody[i] then
+            Phi: sysdef@IG[i]
+        else
+            Phi: evalModalTaylor(sysdef@ebody[i]@I, sysdef@elastic_dof_idx[i], sysdef@states, eps),
+            
+        PhiG_global: simplify_(rotationToGlobal . Phi . rotationToLocal),
+        
+        MG[i]: -PhiG_global . sysdef@omegad[i] - crossmat(sysdef@omega[i]) . (PhiG_global . sysdef@omega[i]),
+        
+        if sysout@ebody[i] # ebody[i] then (
+            omega_local: rotationToLocal . sysdef@omega[i],
+
+            MG[i]: MG[i] + crossmat(md_global) . (sysdef@gravity - sysdef@aG[i]),
+            
+            Cr: evalModalTaylor(sysdef@ebody[i]@Cr, sysdef@elastic_dof_idx[i], sysdef@states, eps),
+            Cr_dd: zeromatrix(3, 1),
+            for iedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
+                Cr_dd: Cr_dd + transpose(row(Cr, iedof)) * sysdef@states_dd[sysout@elastic_dof_idx[i][iedof]]*eps
+            ),
+            MG[i]: MG[i] - rotationToGlobal . Cr_dd,
+            
             Gr: evalModalTaylor(sysdef@ebody[i]@Gr, sysdef@elastic_dof_idx[i], sysdef@states, eps),
+            Gr_: zeromatrix(3, 3),
             for iedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
                 Gr_: Gr_ + Gr[iedof] * sysdef@states_d[sysout@elastic_dof_idx[i][iedof]]*eps
             ),
-            MG_local: MG_local - simplify_(Gr_ . omega_local),
+            MG[i]: MG[i] - rotationToGlobal . Gr_ . omega_local
+        ),
+        
+        if sysout@ebody[i] = ebody[i] then (
+            Re[i]: []
+        ) else (
+            aG_grav_local: rotationToLocal . (sysdef@aG[i] - sysdef@gravity),
+            omegad_local: rotationToLocal . sysdef@omegad[i],
 
-            /* Re[i]: Re[i] - simplify_(Ct . crossmat(omega_local) . vG_local), */
+            Re[i]: zeromatrix(length(sysout@elastic_dof_idx[i]), 1),
+            
+            for iedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
+                Re[i][iedof, 1]: - row(Ct, iedof) . aG_grav_local,
+                Re[i][iedof, 1]: Re[i][iedof, 1] - row(Cr, iedof) . omegad_local,
+                for jedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
+                    Re[i][iedof, 1]: Re[i][iedof, 1] - sysdef@ebody[i]@Me@M0[iedof, jedof] * sysdef@states_dd[sysout@elastic_dof_idx[i][jedof]]*eps
+                )
+            ),
+            
             w: matrix([omega_local[1, 1]*omega_local[1, 1], omega_local[2, 1]*omega_local[2, 1], omega_local[3, 1]*omega_local[3, 1], omega_local[1, 1]*omega_local[2, 1], omega_local[2, 1]*omega_local[3, 1], omega_local[1, 1]*omega_local[3, 1]]),
-            Re[i]: Re[i] - simplify_(evalModalTaylor(sysdef@ebody[i]@Oe, sysdef@elastic_dof_idx[i], sysdef@states, eps) . transpose(w)),
+            Re[i]: Re[i] - evalModalTaylor(sysdef@ebody[i]@Oe, sysdef@elastic_dof_idx[i], sysdef@states, eps) . transpose(w),
 
             Ge: evalModalTaylor(sysdef@ebody[i]@Ge, sysdef@elastic_dof_idx[i], sysdef@states, eps),
             for iedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
-                Ge_: zeromatrix(3, 1),
+                Ge_: zeromatrix(1, 3),
                 for jedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
                     /* TODO: check for correct order of jedof and iedof */
-                    Ge_: Ge_ + transpose(row(Ge[jedof], iedof)) * sysdef@states_d[sysout@elastic_dof_idx[i][jedof]]*eps
+                    Ge_: Ge_ + row(Ge[jedof], iedof) * sysdef@states_d[sysout@elastic_dof_idx[i][jedof]]*eps
                 ),
-                Re[i][iedof, 1]: Re[i][iedof, 1] - simplify_(transpose(Ge_) . omega_local)
+                Re[i][iedof, 1]: Re[i][iedof, 1] - Ge_ . omega_local
             ),
 
             K: evalModalTaylor(sysdef@ebody[i]@K, sysdef@elastic_dof_idx[i], sysdef@states, eps),
@@ -74,20 +93,12 @@ computeForceBalance(sysdef):= block([R, MG, PhiG_local, aG_local, omegad_local, 
                     Re[i][iedof, 1]: Re[i][iedof, 1] - K[iedof, jedof] * sysdef@states[sysout@elastic_dof_idx[i][jedof]]*eps, /* eps? */
                     Re[i][iedof, 1]: Re[i][iedof, 1] - D[iedof, jedof] * sysdef@states_d[sysout@elastic_dof_idx[i][jedof]]*eps /* eps? */
                 )
-            ),
-
-            R[i]: simplify_(submatrix(4, sysdef@T0G[i], 4) . R_local),
-            MG[i]: simplify_(submatrix(4, sysdef@T0G[i], 4) . MG_local),
-            
-            R[i]: R[i] + sysdef@ebody[i]@refmod@mass * sysdef@gravity,
-
-            grav_local: transpose(submatrix(4, sysdef@T0G[i], 4)) . sysdef@gravity,
-            MG[i]: MG[i] + simplify_(submatrix(4, sysdef@T0G[i], 4) . crossmat(evalModalTaylor(sysdef@ebody[i]@md, sysdef@elastic_dof_idx[i], sysdef@states, eps)) . grav_local),
-            for iedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
-                Re[i][iedof, 1]: Re[i][iedof, 1] + simplify_(row(Ct, iedof) . grav_local)
             )
         )
     ),
+    R: simplify_(R),
+    MG: simplify_(MG),
+    Re: simplify_(Re),
     bodyforces@R: makelist(R[i], i, 1, sysdef@nbrbody),
     bodyforces@MG: makelist(MG[i], i, 1, sysdef@nbrbody),
     bodyforces@Re: makelist(Re[i], i, 1, sysdef@nbrbody),
