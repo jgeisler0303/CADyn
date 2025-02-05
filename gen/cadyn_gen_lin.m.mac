@@ -1,0 +1,46 @@
+load(cadyn_gen_matlab_util);
+
+cadyn_gen_lin(sysdef, [varargs]):= block(
+    file: sysdef@sys_rel@file,
+    filepath: pathname_directory(file),
+    if length(varargs)>0 then (
+        filepath: varargs[1],
+        if slength(filepath)>0 then
+            if notequal(substring (filepath, slength(filepath), slength(filepath)+1),"/") then
+                filepath: sconcat(filepath, "/")
+    ),
+    filename: pathname_name(file),
+
+    out_name: sconcat(filepath, filename, "_lin.m"),
+    writeMATLAB_linear(sysdef,  out_name),
+    done
+);
+
+writeMATLAB_linear(sys, file):= block([i, fid, subst_list],
+    fid: openw(file),
+    
+    subst_list: [],
+    for i:1 thru length(sys@params) do
+        subst_list: endcons(sys@params[i]=concat('param\., sys@params[i]), subst_list),
+        
+    pre_calc: subst(subst_list, sys@const_eqns),
+    
+    for i:1 thru length(pre_calc) do (
+        printf(fid, "~a= ~a;~%", first(pre_calc[i]), sremove("\\", string(second(pre_calc[i]))))
+    ),
+    
+    if length(sys@f_lin)>0 and length(sys@f_lin@E)>0 then (
+        printf(fid, "~%"),
+        writeMATLABMat(fid, "E", sys@f_lin@E, subst_list),
+        printf(fid, "~%"),
+        writeMATLABMat(fid, "A", sys@f_lin@A, subst_list),
+        printf(fid, "~%"),
+        writeMATLABMat(fid, "B", sys@f_lin@B, subst_list),
+        printf(fid, "~%"),
+        writeMATLABMat(fid, "C", sys@f_lin@C, subst_list),
+        printf(fid, "~%"),
+        writeMATLABMat(fid, "D", sys@f_lin@D, subst_list)
+    ),
+    
+    close(fid)
+);

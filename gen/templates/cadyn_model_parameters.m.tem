@@ -1,5 +1,6 @@
 parameter_names= {
 <<block([],
+    params: sysdef@all_params,
     for i:1 thru length(params) do (
         if subvarp(params[i]) then (
             gentran(literal("    '", eval(op(params[i])), "'", cr))

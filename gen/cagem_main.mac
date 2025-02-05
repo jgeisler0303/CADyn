@@ -147,8 +147,8 @@ cagem(file, [varargs]):= block([output, i, appliedF, appliedM, appliedFe, T0G, a
     
     if length(varargs)>0 then (
         if varargs[1]=1 then (
-            const_eqns: [],
-                
+            print("REDUCE CONSTANTS SEEMS TO BE BROKEN, IT WILL THEREFORE NOT BE APPLIED")
+/*            const_eqns: [],
             load (rducon),
             
             const_prefix: pre_calc_const,
@@ -166,7 +166,7 @@ cagem(file, [varargs]):= block([output, i, appliedF, appliedM, appliedFe, T0G, a
             if length(output@constraints)>0 then
                 output@constraints: reduce_consts(output@constraints),
 
-            output@const_eqns: const_eqns
+            output@const_eqns: const_eqns*/
         )
     ),
     

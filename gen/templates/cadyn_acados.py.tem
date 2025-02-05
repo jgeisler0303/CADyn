@@ -1,4 +1,33 @@
-<<gentran(literal("# File generated form template cadyn_acados.py.tem on ", eval(timedate()), ". Do not edit!", cr))$>>
+<<block(
+    file: sysdef@sys_rel@file,
+    title: sysdef@sys_rel@name,
+    nbrdof: sysdef@sys_rel@nbrdof,
+    nbrbody: sysdef@sys_rel@nbrbody,
+    nbrdep: sysdef@sys_rel@nbrdep,
+    nbrin: sysdef@sys_rel@nbrin,
+    u: sysdef@sys_rel@u,
+    default_states: sysdef@sys_rel@default_states,
+    states: sysdef@sys_rel@states,
+    states_d: sysdef@sys_rel@states_d,
+    states_dd: sysdef@sys_rel@states_dd,
+    y: sysdef@outputs,
+    external: sysdef@sys_rel@external,
+    params: sysdef@all_params,
+
+    f: sysdef@f,
+    
+    pre_calc_const: sysdef@const_eqns,
+    
+    subst_list: [],
+    if sysdef@sys_rel@default_states=1 then (
+        for i:1 thru nbrdof do
+            subst_list: endcons(q[i]=concat(q, i), subst_list),
+        for i:1 thru nbrdof do
+            subst_list: endcons(qd[i]=concat(qd, i), subst_list),
+        for i:1 thru nbrdof do
+            subst_list: endcons(qdd[i]=concat(qdd, i), subst_list)
+    )
+)$>><<gentran(literal("# File generated form template cadyn_acados.py.tem on ", eval(timedate()), ". Do not edit!", cr))$>>
 <<gentran(literal("# Multibody system: ", eval(title), cr, cr))$>>
 
 from acados_template import AcadosModel

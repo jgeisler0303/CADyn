@@ -1,0 +1,17 @@
+writeMATLABMat(fid, name, m, subst_list):= block([i, j],
+    printf(fid, "~a= [~%", name),
+    for i: 1 thru length(m) do (
+        printf(fid, "    "),
+        for j: 1 thru length(transpose(m)) do (
+            printf(fid, "~a", (ssubst(")", "]", ssubst("(", "[", sremove("\\", string(subst(subst_list, m[i, j]))))))),
+            if j#length(transpose(m)) then
+                printf(fid, ", ")
+        ),
+        if i=length(m) then
+            printf(fid, "~%")
+        else
+            printf(fid, ";~%")
+    ),
+    printf(fid, "];~%")
+);
+

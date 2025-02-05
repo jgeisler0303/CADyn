@@ -1,6 +1,8 @@
-
-
-void <<gentran(literal(eval(filename)))$>>::calculateExternal() {
+<<block(
+    load(cadyn_prepare_direct_variables),
+    
+    cadyn_prepare_direct_variables(sysdef)
+)$>>void <<gentran(literal(eval(filename)))$>>::calculateExternal() {
 <<block([i], 
         for i:1 thru length(external) do
             gentran(literal("    ", eval(external[i]), "= 0.0\;", cr))

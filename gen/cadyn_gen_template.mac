@@ -1,0 +1,33 @@
+cadyn_gen_template(sysdef, templ_name, [varargs]):= block([filepath, filename, templ_ext, out_name, templ_path],
+    filepath: pathname_directory(sysdef@sys_rel@file),
+    if length(varargs)>0 then (
+        filepath: varargs[1],
+        if slength(filepath)>0 then
+            if notequal(substring (filepath, slength(filepath), slength(filepath)+1),"/") then
+                filepath: sconcat(filepath, "/")
+    ),
+    filename: pathname_name(sysdef@sys_rel@file),
+
+    const_matrix_once: 0,
+    if length(varargs)>1 then
+        if varargs[2]=1 then
+            const_matrix_once: 1,
+    
+    load("gentran"),
+    load(operatingsystem),
+
+    gentranlang: 'c,
+    genfloat: true,
+    gentranseg: false,
+    clinelen: 1000,
+    
+    templ_ext: ssubst("", ".tem", ssubst("", "cadyn_", templ_name)),
+    out_name: sconcat(filepath, filename, "_", templ_ext),
+    if file_search(out_name)#false then delete_file(out_name),
+    templ_path: ssubst(sconcat("templates/", templ_name), "cagem.mac", cagem_dir),
+    gentranin(templ_path, [out_name]),
+    
+    done
+);
+
+

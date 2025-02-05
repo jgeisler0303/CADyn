@@ -1,0 +1,18 @@
+cadyn_prepare_parameters(sysdef):= block(
+    pre_calc_const: sysdef@const_eqns,
+    
+    subst_list: [],
+    if sysdef@sys_rel@default_states=0 then (
+        for i:1 thru nbrdof do (
+            subst_list: endcons(sysdef@sys_rel@states[i]='q[i-1], subst_list),
+            subst_list: endcons(sysdef@sys_rel@states_d[i]='qd[i-1], subst_list),
+            subst_list: endcons(sysdef@sys_rel@states_dd[i]='qdd[i-1], subst_list)
+        )
+    ),
+    for i:1 thru nbrin do
+        subst_list: endcons(sysdef@sys_rel@u[i]='u[i-1], subst_list),
+    for i:1 thru nbrin do
+        subst_list: endcons(sysdef@sys_rel@u[i]='u[i-1], subst_list),
+    for i:1 thru length(sysdef@params) do
+        subst_list: endcons(sysdef@params[i]=concat('param\., sysdef@params[i]), subst_list)
+);

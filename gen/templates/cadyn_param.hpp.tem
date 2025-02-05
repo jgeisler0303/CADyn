@@ -1,3 +1,13 @@
+<<block(
+    load(cadyn_gen_util),
+    load(cadyn_prepare_direct_variables),
+    load(cadyn_prepare_parameters),
+    
+    cadyn_prepare_direct_variables(sysdef),
+    cadyn_prepare_parameters(sysdef)
+)$>><<gentran(literal("\/\* File generated form template cadyn_direct_params.hpp.tem on ", eval(timedate()), ". Do not edit! \*\/"))$>>
+<<gentran(literal("\/\* Multibody system: ", eval(title), " \*\/"))$>>
+
 #include <string>
 #include <map>
 #include <fstream>
@@ -6,9 +16,6 @@
 #include <cstdio>
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
-
-<<gentran(literal("\/\* File generated form template cadyn_direct_params.hpp.tem on ", eval(timedate()), ". Do not edit! \*\/", cr))$>>
-<<gentran(literal("\/\* Multibody system: ", eval(title), " \*\/", cr, cr))$>>
 
 #ifdef WITH_CONSTANTS
 <<block([i, j],

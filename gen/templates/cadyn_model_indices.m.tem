@@ -1,4 +1,15 @@
-<<gentran(literal("%% File generated form template cadyn_indices.m.tem on ", eval(timedate()), ". Do not edit!", cr))$>>
+<<block(
+    file: sysdef@sys_rel@file,
+    title: sysdef@sys_rel@name,
+    nbrdof: sysdef@sys_rel@nbrdof,
+    nbrbody: sysdef@sys_rel@nbrbody,
+    nbrdep: sysdef@sys_rel@nbrdep,
+    nbrin: sysdef@sys_rel@nbrin,
+    nbrout: length(sysdef@outputs),
+    states: sysdef@sys_rel@states,
+    inputs: sysdef@sys_rel@u,
+    out_names: sysdef@sys_rel@out_names
+)$>><<gentran(literal("%% File generated form template cadyn_indices.m.tem on ", eval(timedate()), ". Do not edit!", cr))$>>
 <<gentran(literal("%% Multibody system: ", eval(title), cr, cr))$>>
 
 nq = <<gentran(literal(eval(nbrdof)))$>>;
