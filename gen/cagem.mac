@@ -15,7 +15,7 @@
  */
 
 cagem_dir: load_pathname;
-file_search_maxima: append (file_search_maxima, [concat(cagem_dir, "###.mac")]);
+file_search_maxima: append (file_search_maxima, [concat(pathname_directory(cagem_dir), "###.mac")]);
 
 load(lrats);
 
