@@ -73,12 +73,12 @@ if ~skip_gen
     for i= 1:length(files_to_generate)
         if skip_gen_file(i), continue, end
 
-        [gen_cmd, load_cmd]= get_generator(files_to_generate{i}, target_path, const_matrix_once);
+        [gen_cmd, load_cmd]= get_generator(files_to_generate{i}, target_path, const_matrix_once, cagem_path);
         if isempty(gen_cmd), continue, end
 
         if isempty(load_cmd) && ~template_gen_loaded
             template_gen_loaded= true;
-            command_str= [command_str, 'load(\"' strrep(getenv('cagem_path'), 'cagem.mac', 'cadyn_gen_template.mac') '\")\$ '];
+            command_str= [command_str, 'load(\"' strrep(cagem_path, 'cagem.mac', 'cadyn_gen_template.mac') '\")\$ '];
         else
             command_str= [command_str, load_cmd];
         end
@@ -126,23 +126,23 @@ else
     final_name= generator;
 end
 
-function [gen_cmd, load_cmd]= get_generator(generator, target_path, const_matrix_once)
+function [gen_cmd, load_cmd]= get_generator(generator, target_path, const_matrix_once, cagem_path)
 if generator(1)=='_', generator(1)= []; end
 
 template_name= ['cadyn_' generator '.tem'];
-if exist(strrep(getenv('cagem_path'), 'cagem.mac', fullfile('templates', template_name)), 'file')
+if exist(strrep(cagem_path, 'cagem.mac', fullfile('templates', template_name)), 'file')
     load_cmd= '';
     gen_cmd= ['cadyn_gen_template(sys, \"' template_name '\", \"' target_path '\", ' num2str(const_matrix_once) ')\$ '];
 else
     gen_script= ['cadyn_gen_' generator];
     gen_script_file= [gen_script '.mac'];
     [~, gen_script]= fileparts(gen_script);
-    if ~exist(strrep(getenv('cagem_path'), 'cagem.mac', gen_script_file), 'file')
+    if ~exist(strrep(cagem_path, 'cagem.mac', gen_script_file), 'file')
         warning('Don''t know how to make %s. No template and no script found', generator)
         load_cmd= '';
         gen_cmd= '';
     else
-        load_cmd= ['load(\"' strrep(getenv('cagem_path'), 'cagem.mac', gen_script_file) '\")\$ '];
+        load_cmd= ['load(\"' strrep(cagem_path, 'cagem.mac', gen_script_file) '\")\$ '];
         gen_cmd= [gen_script '(sys, \"' target_path '\")\$ '];
     end
 end
