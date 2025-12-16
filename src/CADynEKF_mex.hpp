@@ -26,6 +26,7 @@
 #define rhs_idx_fixedRxx 13
 #define rhs_idx_opt 14
 #define rhs_idx_P 15
+#define rhs_idx_ddq0 16
 
 #define lhs_idx_q 0
 #define lhs_idx_qd 1
@@ -40,7 +41,7 @@
 #define lhs_idx_s_xx 10
 #define lhs_idx_P 11
 
-typedef EKF_autotune<EKF_STATES, SYSTEM> EKF;
+typedef EKF_autotune<EKF_STATES, EKF_SYSTEM> EKF;
 
 bool tryGetOption(double *value, const char *name, const mxArray *mxOptions, int m__=1, int n__=1);
 
@@ -65,7 +66,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
         return;
     }
     
-    if(nrhs<8 || nrhs>16) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of arguments. Expecting (q0, dq0, u, y, param, ts, x_ul, x_ll, {Q, R, T_adapt, adaptScale, fixedQxx, fixedRxx, options, P0})"); return; }
+    if(nrhs<8 || nrhs>17) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of arguments. Expecting (q0, dq0, u, y, param, ts, x_ul, x_ll, {Q, R, T_adapt, adaptScale, fixedQxx, fixedRxx, options, P0, ddq0})"); return; }
     if(nlhs<4 || nlhs>12) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of return values. Expecting [q, qd, qdd, y, {Q, R, cpu_time, d_norm, p_xx, r_xx, s_xx, P_end}]"); return; }
     
     if(!mxIsDouble(prhs[rhs_idx_q0]) || mxGetNumberOfElements(prhs[rhs_idx_q0])!=EKF::nbrdof) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'q0' (%d expected)", EKF::nbrdof); return; }
@@ -109,7 +110,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
             return;
         }
     }
-    
+    if(nrhs>rhs_idx_P)
+        if(!mxIsDouble(prhs[rhs_idx_ddq0]) || mxGetNumberOfElements(prhs[rhs_idx_ddq0])!=EKF::nbrdof) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'ddq0' (%d expected)", EKF::nbrdof); return; }
+
     EKF ekf;
     {
         int x_idx= 0;
@@ -186,6 +189,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     for(int i= 0; i<EKF::nbrdof; ++i) {
         ekf.system.q(i)= q0[i];
         ekf.system.qd(i)= dq0[i];
+    }
+    if(nrhs>rhs_idx_P) {
+        double *ddq0= mxGetPr(prhs[rhs_idx_ddq0]);
+        for(int i= 0; i<EKF::nbrdof; ++i) {
+            ekf.system.qdd(i)= ddq0[i];
+        }
     }
     
     double *x_ul= mxGetPr(prhs[rhs_idx_x_ul]);

@@ -26,47 +26,70 @@
             subst_list: endcons(qd[i]=concat(qd, i), subst_list),
         for i:1 thru nbrdof do
             subst_list: endcons(qdd[i]=concat(qdd, i), subst_list)
+    ),
+    
+    /* Filter unused states */
+    eliminate_dof_state: [],
+    for i:1 thru nbrdof do (
+        if freeof(sysdef@sys_rel@states[i], f) and freeof(sysdef@sys_rel@states[i], y) then
+            eliminate_dof_state: endcons(true, eliminate_dof_state)
+        else
+            eliminate_dof_state: endcons(false, eliminate_dof_state)
+    ),
+    eliminate_dof_velo: [],
+    for i:1 thru nbrdof do (
+        if freeof(sysdef@sys_rel@states_dd[i], f) and freeof(sysdef@sys_rel@states_dd[i], y) then
+            eliminate_dof_velo: endcons(true, eliminate_dof_velo)
+        else
+            eliminate_dof_velo: endcons(false, eliminate_dof_velo)
     )
+    
 )$>><<gentran(literal("%% File generated form template cadyn_acados.m.tem on ", eval(timedate()), ". Do not edit!", cr))$>>
 <<gentran(literal("%% Multibody system: ", eval(title), cr, cr))$>>
 
-function model= <<gentran(literal(eval(filename)))$>>_acados()
+function [model, index_name]= <<gentran(literal(eval(filename)))$>>_acados(param)
 
 import casadi.*
 
-% system dimensions
-nx = 2*<<gentran(literal(eval(nbrdof)))$>>;
-nu = <<gentran(literal(eval(nbrin)))$>>;
-ny = <<gentran(literal(eval(length(y))))$>>;
+model = AcadosModel();
 
 % system parameters
 stateName= {
 <<block([i], 
-    for i:1 thru nbrdof do
-        if sysdef@sys_rel@default_states=1 then
-            gentran(literal("    'q", eval(i), "'", cr))
-        else
-            gentran(literal("    '", eval(states[i]), "'", cr))
+    for i:1 thru nbrdof do (
+        if not(eliminate_dof_state[i]) then (
+            if sysdef@sys_rel@default_states=1 then
+                gentran(literal("    'q", eval(i), "'", cr))
+            else
+                gentran(literal("    '", eval(states[i]), "'", cr))
+        )
+    )
 )$>>};
 makeCasADiNamedVector('q', stateName, [], 1, 0);
 
 dstateName= {
 <<block([i], 
-    for i:1 thru nbrdof do
-        if sysdef@sys_rel@default_states=1 then
-            gentran(literal("    'qd", eval(i), "'", cr))
-        else
-            gentran(literal("    '", eval(states[i]), "_d'", cr))
+    for i:1 thru nbrdof do (
+        if not(eliminate_dof_velo[i]) then (
+            if sysdef@sys_rel@default_states=1 then
+                gentran(literal("    'qd", eval(i), "'", cr))
+            else
+                gentran(literal("    '", eval(states[i]), "_d'", cr))
+        )
+    )
 )$>>};
 makeCasADiNamedVector('qd', dstateName, [], 1, 0);
 
 ddstateName= {
 <<block([i], 
-    for i:1 thru nbrdof do
-        if sysdef@sys_rel@default_states=1 then
-            gentran(literal("    'qdd", eval(i), "'", cr))
-        else
-            gentran(literal("    '", eval(states[i]), "_dd'", cr))
+    for i:1 thru nbrdof do (
+        if not(eliminate_dof_velo[i]) then (
+            if sysdef@sys_rel@default_states=1 then
+                gentran(literal("    'qdd", eval(i), "'", cr))
+            else
+                gentran(literal("    '", eval(states[i]), "_dd'", cr))
+        )
+    )
 )$>>};
 makeCasADiNamedVector('qdd', ddstateName, [], 1, 0);
 
@@ -76,17 +99,14 @@ dstateName_= strcat('dot', stateName);
 makeCasADiNamedVector('xdot1', dstateName_, [], 1, 0);
 sym_xdot= [xdot1; qdd];
 
-inputName= cell(nu, 1);
-<<block([i, i_, opt], 
-        ccurrind: 0,
-        for i:1 thru nbrin do (
-            do_assign(concat("inputName{", i, "}"), concat("'", u[i], "'"))
-        )
-)$>>
+inputName= {
+<<block([i], 
+    for i:1 thru nbrin do (
+        gentran(literal("    '", eval(u[i]), "'", cr))
+    )
+)$>>};
 makeCasADiNamedVector('sym_u', inputName, [], 1, 0);
 u= sym_u;
-
-% makeCasADiNamedVector('sym_z', {}, [], 1, 0);
 
 % Parameters
 paramName= struct();
@@ -127,26 +147,37 @@ makeCasADiNamedVector('externals', externalNames, [], 1, 0);
 <<block([i, i_, opt], 
     ccurrind: 0,
 
-    opt: genopt([f], f_temp),
+    f_: f,
+    for i:1 thru nbrdof do (
+        for j:1 thru nbrdof do (
+            if eliminate_dof_velo[j] then (
+                f_[i]: subst(concat('dot, sysdef@sys_rel@states[j]), sysdef@sys_rel@states_d[j], sys@f[i])
+            )
+        )
+    ),
+    for i:1 thru nbrdof do (
+        if not(eliminate_dof_velo[i]) and not(eliminate_dof_state[i]) then (
+            f_: endcons(concat('dot, sysdef@sys_rel@states[i])-sysdef@sys_rel@states_d[i], f_)
+        )
+    ),
+    
+    opt: genopt([f_], f_temp),
     gentran(literal(cr)),
 
-    for i:1 thru nbrdof do (
+    for i:1 thru length(f_) do (
         do_assign(concat('f, i), opt[1][i])
     ),
     
-    gentran(literal("f= [")),
-    for i:1 thru nbrdof do (
+    gentran(literal("%% Implicit Nonlinear State-Space Model", cr)),
+    gentran(literal("f_impl_expr= [")),
+    for i:1 thru length(f_) do (
         gentran(literal("f", eval(i))),
-        if i<nbrdof then
+        if i<length(f_) then
             gentran(literal(", "))
     ),
     gentran(literal("]'\;", cr))    
 )$>>
 
-
-% Implicit Nonlinear State-Space Model
-f_impl_expr = [xdot1 - qd; f];
-        
 
 % Outputs
 <<block([opt], 
@@ -169,7 +200,6 @@ f_impl_expr = [xdot1 - qd; f];
 
 
 % populate structure
-model = AcadosModel();
 model.name= mfilename;
 model.u = sym_u;
 model.x = sym_x;
@@ -177,6 +207,48 @@ model.xdot = sym_xdot;
 model.p = sym_p;
 model.f_impl_expr = f_impl_expr;
 
+% indices and names
+index_name.name= {
+<<block([i], 
+    for i:1 thru nbrdof do (
+        if not(eliminate_dof_state[i]) then (
+            if sysdef@sys_rel@default_states=1 then
+                gentran(literal("    'q", eval(i), "'", cr))
+            else
+                gentran(literal("    '", eval(states[i]), "'", cr))
+        )
+    ),
+    for i:1 thru nbrdof do (
+        if not(eliminate_dof_velo[i]) then (
+            if sysdef@sys_rel@default_states=1 then
+                gentran(literal("    'qd", eval(i), "'", cr))
+            else
+                gentran(literal("    '", eval(states[i]), "_d'", cr))
+        )
+    )
+)$>>};
+
+<<block([i, idx],
+    idx: 1,
+    for i:1 thru nbrdof do (
+        if not(eliminate_dof_state[i]) then (
+            if sysdef@sys_rel@default_states=1 then
+                gentran(literal("index_name.idx.q", eval(i), "= ", eval(idx), "\;", cr))
+            else
+                gentran(literal("index_name.idx.", eval(states[i]), "= ", eval(idx), "\;", cr)),
+            idx: idx+1
+        )
+    ),
+    for i:1 thru nbrdof do (
+        if not(eliminate_dof_velo[i]) then (
+            if sysdef@sys_rel@default_states=1 then
+                gentran(literal("index_name.idx.qd", eval(i), "= ", eval(idx), "\;", cr))
+            else
+                gentran(literal("index_name.idx.", eval(states[i]), "_d= ", eval(idx), "\;", cr)),
+            idx: idx+1
+        )
+    )
+)$>>
 end
 
 

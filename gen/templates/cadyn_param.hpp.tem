@@ -5,7 +5,7 @@
     
     cadyn_prepare_direct_variables(sysdef),
     cadyn_prepare_parameters(sysdef)
-)$>><<gentran(literal("\/\* File generated form template cadyn_direct_params.hpp.tem on ", eval(timedate()), ". Do not edit! \*\/"))$>>
+)$>><<gentran(literal("\/\* File generated form template cadyn_params.hpp.tem on ", eval(timedate()), ". Do not edit! \*\/"))$>>
 <<gentran(literal("\/\* Multibody system: ", eval(title), " \*\/"))$>>
 
 #include <string>
@@ -16,6 +16,8 @@
 #include <cstdio>
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
+
+#include "ParameterInfo.hpp"
 
 #ifdef WITH_CONSTANTS
 <<block([i, j],
@@ -39,51 +41,6 @@
 )$>>
 #endif
 
-class ParameterInfo {
-public:
-    ParameterInfo() :
-        isSet(false),
-        nrows(0),
-        ncols(0),
-        offset(0),
-        data(nullptr)
-        {}
-        
-    ParameterInfo(real_type *data_, int nrows_, int ncols_, int offset_) :
-        isSet(false),
-        nrows(nrows_),
-        ncols(ncols_),
-        offset(offset_),
-        data(data_)
-        {}
-
-    bool setParam(const real_type *value);
-    real_type getParam() const;
-    void getParam(real_type *p) const;
-    bool isSet;
-    int nrows, ncols;
-    int offset;
-    
-private:
-    real_type *data;
-};
-
-bool ParameterInfo::setParam(const real_type *value) {
-    bool wasSet= isSet;
-    
-    memcpy(data, value, sizeof(real_type)*nrows*ncols);
-    isSet= true;
-    return wasSet;
-}
-
-real_type ParameterInfo::getParam() const {
-    return data[0];
-}
-
-void ParameterInfo::getParam(real_type *value) const {
-    memcpy(value, data, sizeof(real_type)*nrows*ncols);
-}
-
 class <<gentran(literal(eval(filename), "Parameters"))$>> {
 public:
     <<gentran(literal(eval(filename), "Parameters"))$>>();
@@ -91,7 +48,7 @@ public:
     real_type getParam(const std::string &name);
     void getParamArray(real_type *p);
     int getNumParameters();
-    void setFromFile(const std::string &fileName);
+    void setFromFile(const std::string &fileName, bool skipUnknown= false);
     bool unsetParamsWithMsg();
     
     std::map<std::string, ParameterInfo> info_map;
@@ -143,7 +100,7 @@ real_type <<gentran(literal(eval(filename), "Parameters"))$>>::getParam(const st
     return it->second.getParam();    
 }
 
-void <<gentran(literal(eval(filename), "Parameters"))$>>::setFromFile(const std::string &fileName) {
+void <<gentran(literal(eval(filename), "Parameters"))$>>::setFromFile(const std::string &fileName, bool skipUnknown) {
     std::ifstream infile(fileName);
     
     if(infile.is_open()) {
@@ -159,8 +116,12 @@ void <<gentran(literal(eval(filename), "Parameters"))$>>::setFromFile(const std:
                 continue;
             
             auto it = info_map.find(paramName);
-            if(it==info_map.end())    
-                throw std::runtime_error("Unknown parameter \"" + paramName + "\".");
+            if(it==info_map.end()) {
+                if(skipUnknown)
+                    continue;
+                else
+                    throw std::runtime_error("Unknown parameter \"" + paramName + "\".");
+            }
             
             Eigen::Matrix<real_type,Eigen::Dynamic,Eigen::Dynamic> value(it->second.nrows, it->second.ncols);
             bool fail= false;
