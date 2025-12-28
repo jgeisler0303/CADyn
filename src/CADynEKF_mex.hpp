@@ -110,7 +110,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
             return;
         }
     }
-    if(nrhs>rhs_idx_P)
+    if(nrhs>rhs_idx_ddq0)
         if(!mxIsDouble(prhs[rhs_idx_ddq0]) || mxGetNumberOfElements(prhs[rhs_idx_ddq0])!=EKF::nbrdof) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'ddq0' (%d expected)", EKF::nbrdof); return; }
 
     EKF ekf;
@@ -190,7 +190,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
         ekf.system.q(i)= q0[i];
         ekf.system.qd(i)= dq0[i];
     }
-    if(nrhs>rhs_idx_P) {
+    if(nrhs>rhs_idx_ddq0) {
         double *ddq0= mxGetPr(prhs[rhs_idx_ddq0]);
         for(int i= 0; i<EKF::nbrdof; ++i) {
             ekf.system.qdd(i)= ddq0[i];
