@@ -43,8 +43,8 @@ composeMotion(sysdef):= block([erel, vrel, vrel_z, arel, wrel, wrel_z, wdrel, vG
                 vGpartial: simplify_(addcol(vGpartial, col(sysout@vGpartial[sysout@BodyRef[i]], j) + crossmat(col(sysout@omegapartial[sysout@BodyRef[i]], j)) . erel + vrel)),
                 omegapartial: simplify_(addcol(omegapartial, col(sysout@omegapartial[sysout@BodyRef[i]], j) + wrel))
             ),
-            sysout@vGpartial[i]: simplify(subst([eps=1], vGpartial)),
-            sysout@omegapartial[i]: simplify(subst([eps=1], omegapartial)),
+            sysout@vGpartial[i]: vGpartial,
+            sysout@omegapartial[i]: omegapartial,
             
             for j: 1 thru sysout@nbrcon do (
                 vrel_z: rotationToGlobal . col(sysout@vGpartial_z[i], j),
@@ -52,15 +52,23 @@ composeMotion(sysdef):= block([erel, vrel, vrel_z, arel, wrel, wrel_z, wdrel, vG
                 vGpartial_z: simplify_(addcol(vGpartial_z, col(sysout@vGpartial_z[sysout@BodyRef[i]], j) + crossmat(col(sysout@omegapartial_z[sysout@BodyRef[i]], j)) . erel + vrel_z)),
                 omegapartial_z: simplify_(addcol(omegapartial_z, col(sysout@omegapartial_z[sysout@BodyRef[i]], j) + wrel_z))
             ),
-            sysout@vGpartial_z[i]: simplify(subst([eps=1], vGpartial_z)),
-            sysout@omegapartial_z[i]: simplify(subst([eps=1], omegapartial_z))
+            sysout@vGpartial_z[i]: vGpartial_z,
+            sysout@omegapartial_z[i]: omegapartial_z
         ),
         
         for iedof: 1 thru length(sysout@elastic_dof_idx[i]) do (
             elasticpartial: addrow(elasticpartial, zeromatrix(1, sysout@nbrdof)),
             elasticpartial[iedof, sysout@elastic_dof_idx[i][iedof]]: 1
         ),
-        sysout@elasticpartial[i]: simplify(subst([eps=1], elasticpartial))
+        sysout@elasticpartial[i]: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps_rot^2=0], elasticpartial)))
+    ),
+    
+    for i: 1 thru sysout@nbrbody do (
+        sysout@vGpartial[i]: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps_rot^2=0], sysout@vGpartial[i]))),
+        sysout@omegapartial[i]: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps_rot^2=0], sysout@omegapartial[i]))),
+        sysout@vGpartial_z[i]: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps_rot^2=0], sysout@vGpartial_z[i]))),
+        sysout@omegapartial_z[i]: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps_rot^2=0], sysout@omegapartial_z[i])))
+                                     
     ),
     
     sysout

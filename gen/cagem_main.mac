@@ -9,17 +9,17 @@ cagem(file, [varargs]):= block([output, i, appliedF, appliedM, appliedFe, T0G, a
             output@sys_rel@nbrdof: length(output@sys_rel@states) + length(output@sys_rel@f_ext),
 
             for i:1 thru output@sys_rel@nbrbody do (
-                output@sys_rel@T0G[i]: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^3=0], output@sys_rel@T0G[i]))),
-                output@sys_rel@vG[i]: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^3=0], output@sys_rel@vG[i]))),
-                output@sys_rel@aG[i]: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^3=0], output@sys_rel@aG[i]))),
-                output@sys_rel@omega[i]: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^3=0], output@sys_rel@omega[i]))),
-                output@sys_rel@omegad[i]: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^3=0], output@sys_rel@omegad[i]))),
-                output@sys_rel@vGpartial[i]: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^3=0], output@sys_rel@vGpartial[i]))),
-                output@sys_rel@omegapartial[i]: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^3=0], output@sys_rel@omegapartial[i])))
+                output@sys_rel@T0G[i]: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^2=0], output@sys_rel@T0G[i]))),
+                output@sys_rel@vG[i]: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^2=0], output@sys_rel@vG[i]))),
+                output@sys_rel@aG[i]: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^2=0], output@sys_rel@aG[i]))),
+                output@sys_rel@omega[i]: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^2=0], output@sys_rel@omega[i]))),
+                output@sys_rel@omegad[i]: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^2=0], output@sys_rel@omegad[i]))),
+                output@sys_rel@vGpartial[i]: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^2=0], output@sys_rel@vGpartial[i]))),
+                output@sys_rel@omegapartial[i]: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^2=0], output@sys_rel@omegapartial[i])))
             ),
             if member('modelOutputsRecursive, map(op, functions)) then (
                 output@outputs: modelOutputsRecursive(output),
-                output@outputs: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^3=0], output@outputs))),
+                output@outputs: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^2=0], output@outputs))),
                 print("Done with outputs")
             ) else
                 output@outputs: [],
@@ -65,13 +65,13 @@ cagem(file, [varargs]):= block([output, i, appliedF, appliedM, appliedFe, T0G, a
     output@f: generalizedBalance(output@sys_abs, output@forces),
     print("Done with generalizedBalance"),
     output@constraints: constraintForces(output@sys_abs, output@forces, [z]),
-    output@constraints: subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^3=0], output@constraints)),
+    output@constraints: subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^2=0], output@constraints)),
     if output@sys_abs@SIMPLIFY=1 then (
         output@constraints: simplify(output@constraints)
     ),
     print("Done with constraintForces"),
     
-    output@f: subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^3=0], output@f)),
+    output@f: subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^2=0], output@f)),
     
     constraints: output@constraints,
     f_ext: ev(output@sys_rel@f_ext, eval),
@@ -89,7 +89,7 @@ cagem(file, [varargs]):= block([output, i, appliedF, appliedM, appliedFe, T0G, a
     
     if member('modelOutputs, map(op, functions)) then (
         output@outputs: modelOutputs(output),
-        output@outputs: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^3=0], output@outputs))),
+        output@outputs: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^2=0], output@outputs))),
         print("Done with outputs")
     ) else (
         output@outputs: []
@@ -98,7 +98,7 @@ cagem(file, [varargs]):= block([output, i, appliedF, appliedM, appliedFe, T0G, a
     if member('modelCost, map(op, functions)) then (
         /* TODO check if cost is scalar */
         output@cost: modelCost(output),
-        output@cost: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^3=0], output@cost))),
+        output@cost: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^2=0], output@cost))),
         print("Done with cost")
     ) else
         output@cost: 0,
@@ -106,14 +106,14 @@ cagem(file, [varargs]):= block([output, i, appliedF, appliedM, appliedFe, T0G, a
     if member('modelFinalCost, map(op, functions)) then (
         /* TODO check if cost is scalar */
         output@final_cost: modelFinalCost(output),
-        output@final_cost: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^3=0], output@final_cost))),
+        output@final_cost: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^2=0], output@final_cost))),
         print("Done with final cost")
     ) else
         output@final_cost: 0,
         
     if member('modelConstraints, map(op, functions)) then (
         output@constraints: modelConstraints(output),
-        output@constraints: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^3=0], output@constraints))),
+        output@constraints: simplify(subst([eps=1, eps_rot=1], fullratsubst([eps^2=0, eps_rot^2=0], output@constraints))),
         print("Done with final constraints")
     ) else
         output@constraints: [],

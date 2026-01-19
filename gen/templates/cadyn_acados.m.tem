@@ -191,9 +191,9 @@ makeCasADiNamedVector('externals', externalNames, [], 1, 0);
     
     gentran(literal("sym_y= [")),
     for i:1 thru length(y) do (
-        gentran(literal("sym_y", eval(i))),
-        if i<nbrdof then
-            gentran(literal(", "))
+        if i#1 then
+            gentran(literal(", ")),
+        gentran(literal("sym_y", eval(i)))
     ),
     gentran(literal("]'\;", cr))    
 )$>>

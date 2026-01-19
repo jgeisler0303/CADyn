@@ -1,0 +1,27 @@
+<<block(
+    load(cadyn_gen_util),
+    load(cadyn_prepare_direct_variables),
+    load(cadyn_prepare_parameters),
+    
+    cadyn_prepare_direct_variables(sysdef),
+    cadyn_prepare_parameters(sysdef),
+    
+    for i:1 thru nbrdof do (
+        i_: i-1,
+        do_assign(concat("f_[", i_, "]"), f[i])
+    ),
+    gentran(literal(cr)),
+    
+    for i:1 thru sysdef@sys_rel@nbrbody do (
+        gentran(literal("// body ", eval(i), cr, cr)),
+                                            
+        genmat(sysdef@sys_abs@vGpartial[i], 3, nbrdof, 0, 0, "v_p"),
+        gentran(literal(cr)),
+        genmat(sysdef@sys_abs@omegapartial[i], 3, nbrdof, 0, 0, "om_p"),
+        gentran(literal(cr)),
+        genmat(sysdef@forces@R[i], 3, 1, 0, 0, "F"),
+        gentran(literal(cr)),
+        genmat(sysdef@forces@MG[i], 3, 1, 0, 0, "M"),
+        gentran(literal(cr))
+    )
+)$>>
