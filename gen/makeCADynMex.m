@@ -52,8 +52,12 @@ end
     
 includes= {
     '.', ...
-    fullfile(cagem_base, 'src')
+    fullfile(cagem_base, 'src'), ...
     };
+if ~isempty(getenv('EIGEN3'))
+    includes{end+1} = getenv('EIGEN3');
+end
+
 if exist('add_includes', 'var')
     if ~iscell(add_includes)
         add_includes= {add_includes};
