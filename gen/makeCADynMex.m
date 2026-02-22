@@ -1,4 +1,5 @@
 function makeCADynMex(model_name, target_path, mex_cpp, mex_name, add_includes)
+%% TODO replace with makeMex
 
 if ~exist('mex_cpp', 'var') || isempty(mex_cpp)
     mex_cpp= 'CADyn_mex.cpp';
@@ -66,15 +67,7 @@ if exist('add_includes', 'var')
 end
 includes= strcat('-I', includes);
 
-sources= {
-%     fullfile(cagem_base, 'src', 'ODEOrder2.cpp')
-    };
-
-%  libs= { % order matters!!!
-%      };
-
-%  lib_dirs= strcat('-L', {acados_lib_dir});
-%  libs= strcat('-l', libs);
+sources= {};
 
 mex_name_ext= [mex_name '.' mexext];
 if exist(fullfile(start_dir, mex_name_ext), 'file')
@@ -107,11 +100,3 @@ end
 if ~compiled
     error('Mex was not properly compiled');
 end
-
-% try
-%     movefile(mex_name_ext, start_dir);
-% catch e
-%     if ~strcmp(e.identifier, 'MATLAB:MOVEFILE:SourceAndDestinationSame')
-%         rethrow(e);
-%     end
-% end

@@ -73,10 +73,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
         return;
     }
     
-    if(nrhs>=(in_idx_ts+1))
+    if(nrhs>in_idx_ts)
         if(!mxIsDouble(prhs[in_idx_ts]) || mxGetNumberOfElements(prhs[in_idx_ts])!=1) { mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Wrong number of elements in 'ts' (1 expected)"); return; }
     
-    if(nrhs>=(in_idx_options+1)) {
+    if(nrhs>in_idx_options) {
         const mxArray *mxOptions= prhs[in_idx_options];
         if(!mxIsStruct(mxOptions) || mxGetNumberOfElements(mxOptions)!=1) {
             mexErrMsgIdAndTxt("CADyn:InvalidArgument", "Input options must be a scalar struct.\n");
@@ -102,7 +102,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     }
     rk1.precalcConsts();
     
-    if(nrhs>=(in_idx_options+1)) {
+    if(nrhs>in_idx_options) {
         const mxArray *mxOptions= prhs[in_idx_options];
         try {
             for(const auto &iter : rk1.options_map) {
@@ -129,7 +129,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     
     double *dx0= mxGetPr(prhs[in_idx_dx0]);
     for(int i=rk1.nI; i<rk1.nX; ++i)
-        rk1.k_II(i-rk1.nI)= dx0[i];
+        rk1.xdot(i-rk1.nI)= dx0[i];
         // TODO: check if dx0.head(nI) == E*x0.tail(nII)
     
     double *u_sim= mxGetPr(prhs[in_idx_u]);;
@@ -137,7 +137,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
         rk1.u(i)= u_sim[i];
     
     double ts= 0.0;
-    if(nrhs>=(in_idx_ts+1)) {
+    if(nrhs>in_idx_ts) {
         ts= mxGetScalar(prhs[in_idx_ts]);
     } else {
         // No ts means: get outputs
@@ -168,23 +168,23 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     for(int i=0; i<rk1.nX; ++i)
         mxGetPr(plhs[out_idx_x])[i]= rk1.x(i);
         
-    if(nlhs>=(out_idx_dx+1)) {
+    if(nlhs>out_idx_dx) {
         plhs[out_idx_dx]= mxCreateDoubleMatrix(rk1.nX, 1, mxREAL);
         for(int i=0; i<rk1.nI; ++i)
             mxGetPr(plhs[out_idx_dx])[i]= rk1.E.row(i) * rk1.x.tail(rk1.nII);
             
         for(int i=rk1.nI; i<rk1.nX; ++i)
-            mxGetPr(plhs[out_idx_dx])[i]= rk1.k_II(i-rk1.nI);
+            mxGetPr(plhs[out_idx_dx])[i]= rk1.xdot(i-rk1.nI);
     }
     
-    if(nlhs>=(out_idx_y+1)) {
+    if(nlhs>out_idx_y) {
         rk1.evaluateOutput();
         plhs[out_idx_y]= mxCreateDoubleMatrix(rk1.nOut, 1, mxREAL);
         for(int i=0; i<rk1.nOut; ++i)
             mxGetPr(plhs[out_idx_y])[i]= rk1.y(i);
     }
     
-    if(nlhs>=(out_idx_fxfu+1)) {
+    if(nlhs>out_idx_fxfu) {
         plhs[out_idx_fxfu]= mxCreateDoubleMatrix(rk1.nX, rk1.nX+rk1.nIn, mxREAL);
         for(int irow=0; irow<rk1.nX; ++irow) {
             for(int icol=0; icol<rk1.nX; ++icol)
@@ -194,7 +194,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
         }
     }
     
-    if(nlhs>=(out_idx_gxgu+1)) {
+    if(nlhs>out_idx_gxgu) {
         plhs[out_idx_gxgu]= mxCreateDoubleMatrix(rk1.nOut, rk1.nX+rk1.nIn, mxREAL);
         for(int irow=0; irow<rk1.nOut; ++irow) {
             for(int icol=0; icol<rk1.nX; ++icol)
@@ -204,32 +204,32 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
         }
     }
     
-    if(nlhs>=(out_idx_converged+1)) {
+    if(nlhs>out_idx_converged) {
         plhs[out_idx_converged]= mxCreateDoubleMatrix(1, 1, mxREAL);
         mxGetPr(plhs[out_idx_converged])[0]= res;
     }
         
-    if(nlhs>=(out_idx_cpu_time+1)) {
+    if(nlhs>out_idx_cpu_time) {
         plhs[out_idx_cpu_time]= mxCreateDoubleMatrix(1, 1, mxREAL);
         mxGetPr(plhs[out_idx_cpu_time])[0]= cpu_duration;
     }
     
-    if(nlhs>=(out_idx_error+1)) {
+    if(nlhs>out_idx_error) {
         plhs[out_idx_error]= mxCreateDoubleMatrix(1, 1, mxREAL);
         mxGetPr(plhs[out_idx_error])[0]= rk1.computeError(ts);
     }
     
-    if(nlhs>=(out_idx_n_steps+1)) {
+    if(nlhs>out_idx_n_steps) {
         plhs[out_idx_n_steps]= mxCreateDoubleMatrix(1, 1, mxREAL);
         mxGetPr(plhs[out_idx_n_steps])[0]= rk1.n_steps;
     }
 
-    if(nlhs>=(out_idx_n_back_steps+1)) {
+    if(nlhs>out_idx_n_back_steps) {
         plhs[out_idx_n_back_steps]= mxCreateDoubleMatrix(1, 1, mxREAL);
         mxGetPr(plhs[out_idx_n_back_steps])[0]= rk1.n_back_steps;
     }   
     
-    if(nlhs>=(out_idx_sub_iter+1)) {
+    if(nlhs>out_idx_sub_iter) {
         plhs[out_idx_sub_iter]= mxCreateDoubleMatrix(1, 1, mxREAL);
         mxGetPr(plhs[out_idx_sub_iter])[0]= rk1.sub_iter;
     }   

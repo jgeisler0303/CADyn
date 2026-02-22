@@ -103,7 +103,7 @@ public:
 */
 
 template <class problem_class>
-class RK1condensed : public OptionsAccessor, problem_class {
+class RK1condensed : public OptionsAccessor, public problem_class {
 public:
     static const int nI  = problem_class::dimI;
     static const int nII = problem_class::dimII;
@@ -202,8 +202,6 @@ public:
     void staticEquilibrium();
     void staticEquilibriumWithLin();
 
-    VecII k_II;
-
     MatX fx;
     MatIn fu;
     MatOutX gx;
@@ -238,7 +236,8 @@ typename RK1condensed<problem_class>::step_result RK1condensed<problem_class>::o
     real_type ha = h*rk_a;
     VecX x_store = x;
     VecII xdot_store = xdot;
-    real_type t_sto = t + ha;
+    real_type t_store = t;
+    t += ha;
 
     int iter_jac= 0;
     if(hmodified && jac_recalc_step>1) iter_jac= 1;
@@ -247,9 +246,16 @@ typename RK1condensed<problem_class>::step_result RK1condensed<problem_class>::o
     VecII Dii = VecII::Zero();
     for (iter = 1; iter <= max_steps; ++iter, ++sub_iter) {
         // x_{k+1} = x_k + a*h*k
+        // for x_II, locked states are already considered because xdot is zero for locked states
         x.tail(nII) = x_store.tail(nII) + ha * xdot;
         // compute x_II first because k_II also affects x_I
-        x.head(nI) =  x_store.head(nI)  + ha * E*x.tail(nII);
+        for (int i = 0; i < nI; ++i) {
+            if(locked_states[i])
+                x[i] = x_store[i];
+            else
+                x[i] = x_store[i]  + ha * E.row(i) * x.tail(nII);
+        }
+
 
         if((iter%jac_recalc_step)==iter_jac) {
             evaluateResidualAndJacobians();
@@ -303,7 +309,7 @@ typename RK1condensed<problem_class>::step_result RK1condensed<problem_class>::o
 
     if(iter >= max_steps || !std::isfinite(err)) {
             // restore state to before the failed step
-            t= t_sto;
+            t= t_store;
             x= x_store;
             xdot= xdot_store;
             if(iter >= max_steps)
@@ -313,9 +319,15 @@ typename RK1condensed<problem_class>::step_result RK1condensed<problem_class>::o
     }
 
     // take the full step
-    t = t_sto + h;
+    t = t_store + h;
     x_last = x_store; // save the state before the step (x_k) for error estimation
-    x.head(nI) =  x_store.head(nI)  + h * E*(x_store.tail(nII) + ha * xdot);
+    VecII x_II_ha_xdot = x_store.tail(nII) + ha * xdot;
+    for (int i = 0; i < nI; ++i) {
+        if(locked_states[i])
+            x[i] = x_store[i];
+        else
+            x[i] = x_store[i]  + h * E.row(i) * x_II_ha_xdot;
+    }
     x.tail(nII) = x_store.tail(nII) + h * xdot;
 
     return success;
@@ -329,7 +341,7 @@ typename RK1condensed<problem_class>::real_type RK1condensed<problem_class>::com
         throw RK1condensedException("Error estimation is not meaningful for rk_a close to 0.5. Please set rk_a to a value sufficiently different from 0.5 (e.g. 0.25 or 0.75) to get a meaningful error estimate.");
     }
     // The error estimate is based on the local truncation error of the method
-    VecX tau;
+    VecX tau = VecX::Zero();
 
     // We first consider a non partitioned, and explicit system for simplicity:
     //   dot x = g(x, t)
@@ -359,14 +371,21 @@ typename RK1condensed<problem_class>::real_type RK1condensed<problem_class>::com
     //   or we can use a diagonal approximation of df_II_dxdot_II for
     VecII kdot = -rhs.cwiseQuotient(df_II_dxdot_II.diagonal().cwiseMax(1e-12));
     
-    tau.tail(nII) = h*h*(0.5 - rk_a)*kdot;
+    // assignment in loop to avoid AVX -Warray-bounds warning for 3-element vectors.
+    const real_type err_fac = h*h*(0.5 - rk_a);
+    for (int i = 0; i < nII; ++i) {
+        tau[nI + i] = err_fac * kdot[i];
+    }
 
     // Estimate local truncation error for condensed part (I)
     // Taylor expansion about t_k: x_I​(t_k​+h) = x_{I,k​} + h E x_{II,k​} + h^2/2 ​E dot x_{II,k}​ + O(h3)
     // Method of this solver:      x_I​(t_k​+h) = x_{I,k}​ + h E x_{II,k} ​+ h^2 a ​E k_II
     // Subtract numerical from exact: tau_I = h^2 E (1/2 dot x_{II,k}​ - a k_II) + O(h^3)
     // Substitute dot x_{II,k}​= k_II + O(h): tau_I approx h^2/2 E (1- a/2) dot x_{II,k} = E tau_II 
-    tau.head(nI) = h*h*(0.5 - rk_a)*E*xdot;
+    VecI tau_I = err_fac * E * xdot;
+    for (int i = 0; i < nI; ++i) {
+        tau[i] = tau_I[i];
+    }
 
     // reconstruct full xdot for scaling the error
     VecX xdot_full;
@@ -406,9 +425,13 @@ void RK1condensed<problem_class>::interval(real_type tfinal, real_type &h_save, 
     
     if (h_save>hmax) h_save= hmax;
     while(t < tfinal) {
-        // Adjust step size to hit tfinal exactly if we are close to it. This is a common practice in ODE solvers to avoid taking a very small step
-        if((t+1.4*h_save) >= tfinal) {
+        // Adjust step size to hit tfinal exactly
+        if((t+h_save) > tfinal) {
             h_save= tfinal-t;
+            hchanged= true;
+        } else if((t+2.1*h_save) > tfinal) {
+            // If the next two steps would take us past tfinal, we need to adjust the step size to avoid one final very small step at the end. This is a common practice in ODE solvers to improve performance and avoid numerical issues with very small steps.
+            h_save= 0.5*(tfinal-t);
             hchanged= true;
         }
         // store current state in case we need to redo the step with smaller step size
@@ -419,7 +442,6 @@ void RK1condensed<problem_class>::interval(real_type tfinal, real_type &h_save, 
         RK1condensed<problem_class>::step_result res = oneStep(h_save, hchanged, pseudo_time_continuation);
         real_type err= computeError(h_save);
         n_steps++;
-        hchanged= false;
 
         // If step failed or error is too large, reduce step size and redo the step
         if((res == max_iterations_reached) || (res == err_not_finite) || (err>1.0))   {
@@ -440,29 +462,32 @@ void RK1condensed<problem_class>::interval(real_type tfinal, real_type &h_save, 
                 throw RK1condensedException("Interval calculation: dynamic step size too small.");
             
             n_back_steps++;
-        } else {
+        } else if (err < StepAdjSafe*StepAdjSafe) {
             h_save*= std::min(StepAdjSafe*sqrt(1.0/err), StepAdjMax);
             if(h_save>hmax) h_save= hmax;
             hchanged= true;
+        } else {
+            hchanged= false;
         }
+
         if(pseudo_time_continuation) {
-            if(n_steps>1000)
-                throw RK1condensedException("Interval calculation: no static equilibrium found after 1000 steps.");
+            if(n_steps>10000)
+                throw RK1condensedException("Interval calculation: no static equilibrium found after 10000 steps.");
+
+            real_type stationarity_check = 0.0;
 
             VecI dot_xI = E*x.tail(nII);
-
-            real_type norm_check = 0.0;
-            for (int i = 0; i < nII; ++i) {
-                if (!locked_states[nI + i]) {
-                    norm_check += xdot[nI + i] * xdot[nI + i];
-                }
-            }
             for (int i = 0; i < nI; ++i) {
                 if (!locked_states[i]) {
-                    norm_check += dot_xI[i] * dot_xI[i];
+                    stationarity_check += dot_xI[i] * dot_xI[i];
                 }
             }
-            if(std::sqrt(norm_check) < StepTol)
+            for (int i = 0; i < nII; ++i) {
+                if (!locked_states[nI + i]) {
+                    stationarity_check += xdot[i] * xdot[i];
+                }
+            }
+            if(err < 1.0 && std::sqrt(stationarity_check) < StepTol)
                 break;
         }
     }
@@ -514,6 +539,7 @@ void RK1condensed<problem_class>::staticEquilibrium() {
     real_type h_eq = 1.0;
     interval(std::numeric_limits<real_type>::infinity(), h_eq, std::numeric_limits<real_type>::infinity(), true);
     rk_a= rk_a_save;
+    t = 0.0; // reset time to zero after pseudo time continuation
 }
 
 template <class problem_class>
