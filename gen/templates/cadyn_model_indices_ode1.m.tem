@@ -1,0 +1,103 @@
+<<block(
+    file: sysdef@sys_rel@file,
+    title: sysdef@sys_rel@name,
+    nbrdof: sysdef@sys_rel@nbrdof,
+    nbrbody: sysdef@sys_rel@nbrbody,
+    nbrdep: sysdef@sys_rel@nbrdep,
+    nbrin: sysdef@sys_rel@nbrin,
+    nbrout: length(sysdef@outputs),
+    inputs: sysdef@sys_rel@u,
+    out_names: sysdef@sys_rel@out_names,
+    f: sysdef@f,
+
+    /* Filter unused states */
+    eliminate_dof_state: [],
+    for i:1 thru nbrdof do (
+        if freeof(sysdef@sys_rel@states[i], f) and freeof(sysdef@sys_rel@states[i], y) then
+            eliminate_dof_state: endcons(true, eliminate_dof_state)
+        else
+            eliminate_dof_state: endcons(false, eliminate_dof_state)
+    ),
+    eliminate_dof_velo: [],
+    for i:1 thru nbrdof do (
+        if freeof(sysdef@sys_rel@states_dd[i], f) and freeof(sysdef@sys_rel@states_dd[i], y) then
+            eliminate_dof_velo: endcons(true, eliminate_dof_velo)
+        else
+            eliminate_dof_velo: endcons(false, eliminate_dof_velo)
+    ),
+
+    nbrII : nbrdof,
+    xII : [],
+    for i:1 thru nbrdof do (
+        for j:1 thru nbrdof do (
+            if eliminate_dof_velo[j] then (
+                xII: endcons(sysdef@sys_rel@states[j], xII)
+            ) else (
+                xII: endcons(sysdef@sys_rel@states_d[j], xII)
+            )
+        )
+    ),
+
+    nbrI : 0,
+    xI : [],
+    for i:1 thru nbrdof do (
+        if not(eliminate_dof_velo[i]) and not(eliminate_dof_state[i]) then (
+            nbrI : nbrI + 1,
+            xI : endcons(sysdef@sys_rel@states[i], xI)
+        )
+    ),
+    ode1_states : append(xI, xII),
+    nbrstates: nbrI + nbrII
+
+)$>><<gentran(literal("%% File generated form template cadyn_indices.m.tem on ", eval(timedate()), ". Do not edit!", cr))$>>
+<<gentran(literal("%% Multibody system: ", eval(title), cr, cr))$>>
+
+nx = <<gentran(literal(eval(nbrstates)))$>>;
+nxdot = <<gentran(literal(eval(nbrII)))$>>;
+nu = <<gentran(literal(eval(nbrin)))$>>;
+ny = <<gentran(literal(eval(nbrout)))$>>;
+
+<<block([i], 
+    for i:1 thru nbrstates do
+        gentran(literal(eval(ode1_states[i]), "_idx= ", eval(i), "\;", cr))
+)$>>
+
+<<block([i], 
+        for i:1 thru nbrin do (
+            gentran(literal("in_", eval(inputs[i]), "_idx= ", eval(i), "\;", cr))
+        )
+)$>>
+
+<<block([i], 
+        for i:1 thru nbrout do (
+            if nbrout#length(out_names) then
+                gentran(literal("out_", eval(i), "_idx= ", eval(i), "\;", cr))
+            else
+                gentran(literal("out_", eval(out_names[i]), "_idx= ", eval(i), "\;", cr))
+        )
+)$>>
+
+state_names= {
+<<block([i], 
+    for i:1 thru nbrstates do
+        gentran(literal("    '", eval(ode1_states[i]), "'", cr))
+)$>>
+};
+
+input_names= {
+<<block([i], 
+    for i:1 thru nbrin do
+        gentran(literal("    '", eval(inputs[i]), "'", cr))
+)$>>
+};
+
+output_names= {
+<<block([i], 
+        for i:1 thru nbrout do (
+            if nbrout#length(out_names) then
+                gentran(literal("    'output", eval(i), "'", cr))
+            else
+                gentran(literal("    '", eval(out_names[i]), "'", cr))
+        )
+)$>>
+};

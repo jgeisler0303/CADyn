@@ -5,7 +5,7 @@
     
     cadyn_prepare_direct_variables(sysdef),
     cadyn_prepare_parameters(sysdef)
-)$>><<gentran(literal("\/\* File generated form template cadyn_direct.cpp.tem on ", eval(timedate()), ". Do not edit! \*\/"))$>>
+)$>><<gentran(literal("\/\* File generated form template cadyn_direct.hpp.tem on ", eval(timedate()), ". Do not edit! \*\/"))$>>
 <<gentran(literal("\/\* Multibody system: ", eval(title), " \*\/"))$>>
 
 #include <string>
@@ -208,8 +208,6 @@ const <<gentran(literal(eval(filename)))$>>::outputs_idx_type <<gentran(literal(
 
 void <<gentran(literal(eval(filename)))$>>::precalcConsts() {
 <<block([i],
-    print(pre_calc_const),
-    
     for i:1 thru length(pre_calc_const) do
         do_assign(first(pre_calc_const[i]), second(pre_calc_const[i])),
         

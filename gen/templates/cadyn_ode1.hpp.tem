@@ -1,0 +1,442 @@
+<<block([i, j],
+    load(cadyn_gen_util),
+    file: sysdef@sys_rel@file,
+    title: sysdef@sys_rel@name,
+    nbrdof: sysdef@sys_rel@nbrdof,
+    nbrin: sysdef@sys_rel@nbrin,
+    nbrout: length(sysdef@outputs),
+    inputs: sysdef@sys_rel@u,
+    output_names: sysdef@sys_rel@out_names,
+    u: sysdef@sys_rel@u,
+    y: sysdef@outputs,
+    external: sysdef@sys_rel@external,
+    d_external: sysdef@sys_rel@d_external,
+    params: sysdef@all_params,
+
+    f: sysdef@f,
+
+    /* Filter unused states */
+    eliminate_dof_state: [],
+    for i:1 thru nbrdof do (
+        if freeof(sysdef@sys_rel@states[i], f) and freeof(sysdef@sys_rel@states[i], y) then
+            eliminate_dof_state: endcons(true, eliminate_dof_state)
+        else
+            eliminate_dof_state: endcons(false, eliminate_dof_state)
+    ),
+    eliminate_dof_velo: [],
+    for i:1 thru nbrdof do (
+        if freeof(sysdef@sys_rel@states_dd[i], f) and freeof(sysdef@sys_rel@states_dd[i], y) then
+            eliminate_dof_velo: endcons(true, eliminate_dof_velo)
+        else
+            eliminate_dof_velo: endcons(false, eliminate_dof_velo)
+    ),
+
+    ode1_II: f,
+    nbrII : nbrdof,
+    xII : [],
+    for i:1 thru nbrdof do (
+        for j:1 thru nbrdof do (
+            if eliminate_dof_velo[j] then (
+                ode1_II[i]: subst(sysdef@sys_rel@states_dd[j], sysdef@sys_rel@states_d[j], sys@f[i]),
+                xII: endcons(sysdef@sys_rel@states[j], xII)
+            ) else (
+                xII: endcons(sysdef@sys_rel@states_d[j], xII)
+            )
+        )
+    ),
+
+    used_pos_states : makelist(false, i, 1, nbrdof),
+    nbrI : 0,
+    xI : [],
+    for i:1 thru nbrdof do (
+        if not(eliminate_dof_velo[i]) and not(eliminate_dof_state[i]) then (
+            used_pos_states[i]: true,
+            nbrI : nbrI + 1,
+            xI : endcons(sysdef@sys_rel@states[i], xI)
+        )
+    ),
+    ode1_states : append(xI, xII),
+    nbrstates: nbrI + nbrII,
+
+    df_II_dx_I : simplify(jacobian(ode1_II, xI)),
+    df_II_dx_II : simplify(jacobian(ode1_II, xII)),
+    df_II_dxdot_II : simplify(jacobian(ode1_II, sysdef@sys_rel@states_dd)),
+
+    df_II_du : simplify(jacobian(ode1_II, u)),
+    dy_dx : simplify(jacobian(y, ode1_states)),
+    dy_du : simplify(jacobian(y, u)),
+    dy_dxdot : simplify(jacobian(y, sysdef@sys_rel@states_dd)),
+
+    subst_list: [],
+    for i:1 thru nbrdof do (
+        subst_list: endcons(sysdef@sys_rel@states[i]='x[i-1], subst_list),
+        subst_list: endcons(sysdef@sys_rel@states_d[i]='x[i-1+nbrI], subst_list),
+        subst_list: endcons(sysdef@sys_rel@states_dd[i]='xdot[i-1], subst_list)
+    ),
+    for i:1 thru nbrin do
+        subst_list: endcons(sysdef@sys_rel@u[i]='u[i-1], subst_list),
+
+    for i:1 thru length(sysdef@params) do
+        subst_list: endcons(sysdef@params[i]=concat('param\., sysdef@params[i]), subst_list)
+
+)$>><<gentran(literal("\/\* File generated form template cadyn_ode1.hpp.tem on ", eval(timedate()), ". Do not edit! \*\/", cr))$>>
+<<gentran(literal("\/\* Multibody system: ", eval(title), " \*\/", cr))$>>
+
+#ifndef <<gentran(literal(eval(filename)))$>>_ODE1_HPP_
+#define <<gentran(literal(eval(filename)))$>>_ODE1_HPP_
+
+#include <string>
+#include <array>
+#include <cmath>
+#include <Eigen/Dense>
+
+typedef double real_type;
+
+#include "<<gentran(literal(eval(filename)))$>>_param.hpp"
+
+class <<gentran(literal(eval(filename)))$>> {
+public:
+    // Condensed system dimensions
+    static constexpr int dimI = <<gentran(literal(eval(nbrI)))$>>;   // number of states that will be condensed out
+    static constexpr int dimII = <<gentran(literal(eval(nbrII)))$>>; // number of states that will be kept
+    static constexpr int dimX = dimI + dimII; // number of states
+    static constexpr int dimIn = <<gentran(literal(eval(nbrin)))$>>; // number of inputs
+    static constexpr int dimOut = <<gentran(literal(eval(length(y))))$>>; // number of outputs
+
+    typedef double real_type;
+    typedef Eigen::Matrix<real_type, dimI+dimII, 1> VecX;
+    typedef Eigen::Matrix<real_type, dimI+dimII, dimI+dimII> MatX;
+    typedef Eigen::Matrix<real_type, dimI, 1> VecI;
+    typedef Eigen::Matrix<real_type, dimII, 1> VecII;
+    typedef Eigen::Matrix<real_type, dimI, dimI> MatI;
+    typedef Eigen::Matrix<real_type, dimI, dimII> MatI_II;
+    typedef Eigen::Matrix<real_type, dimII, dimI> MatII_I;
+    typedef Eigen::Matrix<real_type, dimII, dimII> MatII;
+    typedef Eigen::Matrix<real_type, dimIn, 1> VecIn;
+    typedef Eigen::Matrix<real_type, dimI+dimII, dimIn> MatIn;
+    typedef Eigen::Matrix<real_type, dimII, dimIn> MatII_In;
+    typedef Eigen::Matrix<real_type, dimOut, 1> VecOut;
+    typedef Eigen::Matrix<real_type, dimOut, dimI+dimII> MatOutX;
+    typedef Eigen::Matrix<real_type, dimOut, dimII> MatOutII;
+    typedef Eigen::Matrix<real_type, dimOut, dimIn> MatOutIn;
+
+    <<gentran(literal(eval(filename)))$>>();
+
+    // Residual evaluation: f(x, xdot, u, t) = 0, writes f
+    void evaluateResidual();
+
+    // Jacobian blocks for residual: df/dx, df/dxdot, write f, df_dx, df_dxdot
+    void evaluateResidualAndJacobians();
+
+    // Input Jacobian, writes df_du
+    void evaluateInputJacobian();
+
+    // Output evaluation, writes y
+    void evaluateOutput();
+
+    // Output and its Jacobian, writes y,  dy_dx, dy_dxdot, dy_du
+    void evaluateOutputJacobian();
+
+    void precalcConsts();
+
+<<block([], 
+    if length(external) > 0 then (
+        gentran(literal("    void calculateExternal()\;", cr)),
+        gentran(literal("    void calculateExternalWithDeriv()\;", cr))
+    )
+)$>>
+
+    <<gentran(literal(eval(filename), "Parameters"))$>> param;
+    
+    std::string name;
+    std::string description;
+
+    std::array<std::string, dimIn> in_name;
+    std::array<std::string, dimOut> out_name;
+    std::array<std::string, dimX> state_name;
+
+<<block([i],
+
+    /* Input index by name */
+    gentran(literal(cr, "    typedef struct {", cr)),
+    for i:1 thru nbrin do (
+        gentran(literal("        int ", eval(u[i]), "\;", cr))
+    ),            
+    gentran(literal("    } inputs_idx_type\;", cr)),
+
+    /* Output index by name */
+    gentran(literal(cr, "    typedef struct {", cr)),
+    for i:1 thru nbrout do (
+        gentran(literal("        int ", eval(output_names[i]), "\;", cr))
+    ),            
+    gentran(literal("    } outputs_idx_type\;", cr)),
+
+    /* State index by name */
+    gentran(literal(cr, "    typedef struct {", cr)),
+    for i:1 thru nbrstates do (
+        gentran(literal("        int ", eval(ode1_states[i]), "\;", cr))
+    ),            
+    gentran(literal("    } states_idx_type\;", cr))
+)$>>
+
+    static const states_idx_type states_idx;
+    static const inputs_idx_type inputs_idx;
+    static const outputs_idx_type outputs_idx;
+
+    // Inputs and results
+    real_type t = 0.0;  // current time
+    VecX x;             // state at evaluation time
+    VecII xdot;      // state derivative at evaluation time
+    VecIn u;
+
+<<block([i],
+
+    for i:1 thru length(external) do
+        gentran(literal("    real_type ", eval(external[i]), "\;", cr)),
+        
+    for i:1 thru length(d_external) do
+        gentran(literal("    real_type ", eval(d_external[i]), "\;", cr))
+)$>>
+
+    // Residual and Jacobian storage
+    VecII f_II;
+    MatI_II E;
+    MatII_I df_II_dx_I;
+    MatII df_II_dx_II;
+    MatII df_II_dxdot_II;
+    MatII_In df_II_du;
+
+    // Output storage
+    VecOut y;
+    MatOutX dy_dx;
+    MatOutII dy_dxdot;
+    MatOutIn dy_du;
+    
+<<block([i],
+
+    /* Inputs by name struct */
+    gentran(literal("    struct inputs_t {", cr)),
+    gentran(literal("    public:", cr)),
+    gentran(literal("        inputs_t(VecIn& u) : ")),
+    for i:1 thru nbrin do (
+        gentran(literal(eval(u[i]), "(u.data()[", eval(i-1), "])")),
+        if i#nbrin then
+            gentran(literal(", "))
+    ),            
+    gentran(literal(" {}", cr, cr)),
+    for i:1 thru nbrin do (
+        gentran(literal("        real_type &", eval(u[i]), "\;", cr))
+    ),            
+    gentran(literal("    } inputs\;", cr)),
+
+    /* Outputs by name struct */
+    gentran(literal(cr)),
+    gentran(literal("    struct outputs_t {", cr)),
+    gentran(literal("    public:", cr)),
+    gentran(literal("        outputs_t(VecOut& y) : ")),
+    for i:1 thru nbrout do (
+        gentran(literal(eval(output_names[i]), "(y.data()[", eval(i-1), "])")),
+        if i#nbrout then
+            gentran(literal(", "))
+    ),            
+    gentran(literal(" {}", cr, cr)),
+    for i:1 thru nbrout do (
+        gentran(literal("        real_type &", eval(output_names[i]), "\;", cr))
+    ),            
+    gentran(literal("    } outputs\;", cr)),
+
+    /* States by name struct */
+    gentran(literal(cr)),
+    gentran(literal("    struct states_t {", cr)),
+    gentran(literal("    public:", cr)),
+    gentran(literal("        states_t(VecX& x) : ")),
+    for i:1 thru nbrstates do (
+        gentran(literal(eval(ode1_states[i]), "(x.data()[", eval(i-1), "])")),
+        if i#nbrstates then
+            gentran(literal(", "))
+    ),            
+    gentran(literal(" {}", cr, cr)),
+    for i:1 thru nbrstates do (
+        gentran(literal("        real_type &", eval(ode1_states[i]), "\;", cr))
+    ),            
+    gentran(literal("    } states\;", cr))
+)$>>};
+
+const <<gentran(literal(eval(filename)))$>>::states_idx_type <<gentran(literal(eval(filename)))$>>::states_idx= {<<block([i], for i:1 thru nbrstates do (gentran(literal(eval(i-1))), if i#nbrstates then gentran(literal(", "))))$>>};
+const <<gentran(literal(eval(filename)))$>>::inputs_idx_type <<gentran(literal(eval(filename)))$>>::inputs_idx= {<<block([i], for i:1 thru nbrin do (gentran(literal(eval(i-1))), if i#nbrin then gentran(literal(", "))))$>>};
+const <<gentran(literal(eval(filename)))$>>::outputs_idx_type <<gentran(literal(eval(filename)))$>>::outputs_idx= {<<block([i], for i:1 thru nbrout do (gentran(literal(eval(i-1))), if i#nbrout then gentran(literal(", "))))$>>};
+
+<<gentran(literal(eval(filename)))$>>::<<gentran(literal(eval(filename)))$>>() :
+    param(), 
+    name(<<gentran(literal("\"", eval(filename), "\""))$>>),
+    x(),
+    u(),
+    y(),
+    inputs(u),
+    outputs(y),
+    states(x)
+{
+<<block([i, i_, opt],
+        ccurrind: 4,
+        save_subst_list: subst_list,
+        subst_list: [],
+        
+        for i:1 thru nbrin do (
+            i_: i-1,
+            do_assign(concat("in_name[", i_, "]"), concat("\"", u[i], "\""))
+        ),
+        gentran(literal(cr)),
+        for i:1 thru nbrout do (
+            i_: i-1,
+            do_assign(concat("out_name[", i_, "]"), concat("\"", output_names[i], "\""))
+        ),
+        gentran(literal(cr)),
+        for i:1 thru nbrstates do (
+            i_: i-1,
+            do_assign(concat("state_name[", i_, "]"), concat("\"", ode1_states[i], "\""))
+        ),
+
+        subst_list: save_subst_list
+)$>>
+    x.setZero();
+    xdot.setZero();
+    u.setZero();
+    y.setZero();
+}
+
+void <<gentran(literal(eval(filename)))$>>::precalcConsts() {
+<<block([i, j], 
+    /* TODO: later the aux equations should be included in the length of used_pos_states */
+    gentran(literal("    E.setZero()\;", cr)),
+    j: 1,
+    for i:1 thru length(used_pos_states) do (
+        if used_pos_states[i] then (
+            gentran(literal("    E(", eval(j-1), ", ", eval(i-1), ") = 1.0\;", cr)),
+            j: j+1
+        )
+    )
+)$>>   
+<<block([], 
+    if const_matrix_once=1 then (    
+        gentran(literal(cr)),
+        genmat(df_II_dx_I, nbrII, nbrI, 0, 0, "df_II_dx_I", 2),
+
+        gentran(literal(cr)),
+        genmat(df_II_dx_II, nbrII, nbrII, 0, 0, "df_II_dx_II", 2),
+
+        gentran(literal(cr)),
+        genmat(df_II_dxdot_II, nbrII, nbrII, 0, 0, "df_II_dxdot_II", 2),
+        
+        gentran(literal(cr)),
+        genmat(df_II_du, nbrII, nbrin, 0, 0, "df_II_du", 2),
+            
+        gentran(literal(cr)),
+        genmat(dy_dx, length(y), nbrstates, 0, 0, "dy_dx", 2),
+
+        gentran(literal(cr)),
+        genmat(dy_du, length(y), nbrin, 0, 0, "dy_du", 2),
+
+        gentran(literal(cr)),
+        genmat(dy_dxdot, length(y), nbrII, 0, 0, "dy_dxdot", 2)
+    )
+)$>>}
+
+void <<gentran(literal(eval(filename)))$>>::evaluateResidual() {
+<<block([], 
+   if length(external) > 0 then (
+        gentran(literal("    calculateExternal()\;", cr, cr))
+    )
+)$>>
+<<block([i, i_, opt], 
+    opt: genopt([ode1_II]),
+    gentran(literal(cr)),
+
+    for i:1 thru nbrdof do (
+        i_: i-1,
+        do_assign(concat("f_II[", i_, "]"), opt[1][i])
+    )
+)$>>}
+
+void <<gentran(literal(eval(filename)))$>>::evaluateResidualAndJacobians() {
+<<block([], 
+   if length(external) > 0 then (
+        gentran(literal("    calculateExternalWithDeriv()\;", cr, cr))
+    )
+)$>>
+<<block([i, i_, opt], 
+    if const_matrix_once=1 then (    
+        df_II_dxdot_II: matrixmap(lambda([e], if constantp(e) then 0 else e), df_II_dxdot_II),        
+        df_II_dx_II: matrixmap(lambda([e], if constantp(e) then 0 else e), df_II_dx_II),
+        df_II_dx_I: matrixmap(lambda([e], if constantp(e) then 0 else e), df_II_dx_I)
+    ),
+        
+    opt: genopt([ode1_II, df_II_dxdot_II, df_II_dx_II, df_II_dx_I]),
+    gentran(literal(cr)),
+
+    genmat(opt[2], nbrII, nbrII, 0, 0, "df_II_dxdot_II", const_matrix_once),
+    gentran(literal(cr)),
+    genmat(opt[3], nbrII, nbrII, 0, 0, "df_II_dx_II", const_matrix_once),
+    gentran(literal(cr)),
+    genmat(opt[3], nbrII, nbrI, 0, 0, "df_II_dx_I", const_matrix_once),
+    gentran(literal(cr)),
+
+    for i:1 thru nbrdof do (
+        i_: i-1,
+        do_assign(concat("f_II[", i_, "]"), opt[1][i])
+    )
+)$>>}
+
+void <<gentran(literal(eval(filename)))$>>::evaluateInputJacobian() {
+<<block([opt], 
+    if const_matrix_once=1 then (    
+        df_II_du: matrixmap(lambda([e], if constantp(e) then 0 else e), df_II_du)
+    ),
+    
+    opt: genopt([df_II_du]),
+    gentran(literal(cr)),
+    
+    genmat(opt[1], nbrII, nbrin, 0, 0, "df_II_du", const_matrix_once)
+)$>>}
+
+void <<gentran(literal(eval(filename)))$>>::evaluateOutput() {
+<<block([i, i_, opt],  
+    opt: genopt([y]),
+        
+    for i:1 thru length(y) do (
+        i_: i-1,
+        do_assign(concat("y[", i_, "]"), opt[1][i])
+    )
+)$>>}
+
+void <<gentran(literal(eval(filename)))$>>::evaluateOutputJacobian() {
+<<block([i, i_, opt],  
+    if const_matrix_once=1 then (    
+        dy_dx: matrixmap(lambda([e], if constantp(e) then 0 else e), dy_dx),
+        dy_du: matrixmap(lambda([e], if constantp(e) then 0 else e), dy_du),
+        dy_dxdot: matrixmap(lambda([e], if constantp(e) then 0 else e), dy_dxdot)
+    ),        
+    
+    opt: genopt([y, dy_dx, dy_du, dy_dxdot]),
+    gentran(literal(cr)),
+    
+    for i:1 thru length(y) do (
+        i_: i-1,
+        do_assign(concat("y[", i_, "]"), opt[1][i])
+    ),
+    
+    gentran(literal(cr)),
+    genmat(opt[2], length(y), nbrstates, 0, 0, "dy_dx", const_matrix_once),
+    gentran(literal(cr)),
+    genmat(opt[3], length(y), nbrin, 0, 0, "dy_du", const_matrix_once),
+    gentran(literal(cr)),
+    genmat(opt[4], length(y), nbrII, 0, 0, "dy_dxdot", const_matrix_once)
+)$>>}
+
+<<block([],
+    /* Optional: external headers*/
+    if length(external) > 0 then (
+        gentran(literal("#include \"", eval(filename), "_Externals.hpp\""))
+    )
+)$>>
+
+#endif // "<<gentran(literal(eval(filename)))$>>_ODE1_HPP_
