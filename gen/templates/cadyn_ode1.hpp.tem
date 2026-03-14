@@ -34,17 +34,17 @@
     ode1_II: f,
     nbrII : nbrdof,
     xII : [],
-    for i:1 thru nbrdof do (
-        for j:1 thru nbrdof do (
-            if eliminate_dof_velo[j] then (
-                ode1_II[i]: subst(sysdef@sys_rel@states_dd[j], sysdef@sys_rel@states_d[j], sys@f[i]),
-                xII: endcons(sysdef@sys_rel@states[j], xII)
-            ) else (
-                xII: endcons(sysdef@sys_rel@states_d[j], xII)
-            )
+    xdot : [],
+    for j:1 thru nbrdof do (
+        if eliminate_dof_velo[j] then (
+            xII: endcons(sysdef@sys_rel@states[j], xII),
+            xdot: endcons(sysdef@sys_rel@states_d[j], xdot)
+        ) else (
+            xII: endcons(sysdef@sys_rel@states_d[j], xII),
+            xdot: endcons(sysdef@sys_rel@states_dd[j], xdot)
         )
     ),
-
+        
     used_pos_states : makelist(false, i, 1, nbrdof),
     nbrI : 0,
     xI : [],
@@ -60,19 +60,18 @@
 
     df_II_dx_I : simplify(jacobian(ode1_II, xI)),
     df_II_dx_II : simplify(jacobian(ode1_II, xII)),
-    df_II_dxdot_II : simplify(jacobian(ode1_II, sysdef@sys_rel@states_dd)),
+    df_II_dxdot_II : simplify(jacobian(ode1_II, xdot)),
 
     df_II_du : simplify(jacobian(ode1_II, u)),
     dy_dx : simplify(jacobian(y, ode1_states)),
     dy_du : simplify(jacobian(y, u)),
-    dy_dxdot : simplify(jacobian(y, sysdef@sys_rel@states_dd)),
+    dy_dxdot : simplify(jacobian(y, xdot)),
 
     subst_list: [],
-    for i:1 thru nbrdof do (
-        subst_list: endcons(sysdef@sys_rel@states[i]='x[i-1], subst_list),
-        subst_list: endcons(sysdef@sys_rel@states_d[i]='x[i-1+nbrI], subst_list),
-        subst_list: endcons(sysdef@sys_rel@states_dd[i]='xdot[i-1], subst_list)
-    ),
+    subst_list: append(subst_list, makelist(xI[i]='x[i-1], i, 1, nbrI)),
+    subst_list: append(subst_list, makelist(xII[i]='x[i-1+nbrI], i, 1, nbrII)),
+    subst_list: append(subst_list, makelist(xdot[i]='xdot[i-1], i, 1, nbrII)),
+        
     for i:1 thru nbrin do
         subst_list: endcons(sysdef@sys_rel@u[i]='u[i-1], subst_list),
 
@@ -377,7 +376,7 @@ void <<gentran(literal(eval(filename)))$>>::evaluateResidualAndJacobians() {
     gentran(literal(cr)),
     genmat(opt[3], nbrII, nbrII, 0, 0, "df_II_dx_II", const_matrix_once),
     gentran(literal(cr)),
-    genmat(opt[3], nbrII, nbrI, 0, 0, "df_II_dx_I", const_matrix_once),
+    genmat(opt[4], nbrII, nbrI, 0, 0, "df_II_dx_I", const_matrix_once),
     gentran(literal(cr)),
 
     for i:1 thru nbrdof do (

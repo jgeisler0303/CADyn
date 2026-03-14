@@ -12,10 +12,11 @@
 #include <map>
 #include <algorithm>
 #include <ctime>
+#include "RK1condensed.hpp"
+#include "OptionInfo.hpp"
+
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
-#include "OptionInfo.hpp"
-#include "RK1condensed.hpp"
 //#include "T1_est_ode1.hpp" // uncomment to make IntelliSense happy
 
 #define makeProblemDefinition(c) c
@@ -254,8 +255,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
             }
             for(int j=0; j<EKF::dimX; ++j)
                 mxGetPr(plhs[out_idx_x])[j + i*EKF::dimX]= ekf.rk1_solver.x(j);
+            
+            ProblemDefinition::VecI dxI = ekf.rk1_solver.E * ekf.rk1_solver.x.tail(ekf.rk1_solver.nII);
             for(int j=0; j<EKF::dimI; ++j)
-                mxGetPr(plhs[out_idx_dx])[j + i*EKF::dimX]= ekf.rk1_solver.E.row(j) * ekf.rk1_solver.x.tail(ekf.rk1_solver.nII);
+                mxGetPr(plhs[out_idx_dx])[j + i*EKF::dimX]= dxI(j);
             for(int j=EKF::dimI; j<EKF::dimX; ++j)
                 mxGetPr(plhs[out_idx_dx])[j + i*EKF::dimX]= ekf.rk1_solver.xdot(j-EKF::dimI);
             for(int j=0; j<EKF::dimOut; ++j)

@@ -28,13 +28,11 @@
 
     nbrII : nbrdof,
     xII : [],
-    for i:1 thru nbrdof do (
-        for j:1 thru nbrdof do (
-            if eliminate_dof_velo[j] then (
-                xII: endcons(sysdef@sys_rel@states[j], xII)
-            ) else (
-                xII: endcons(sysdef@sys_rel@states_d[j], xII)
-            )
+    for j:1 thru nbrdof do (
+        if eliminate_dof_velo[j] then (
+            xII: endcons(sysdef@sys_rel@states[j], xII)
+        ) else (
+            xII: endcons(sysdef@sys_rel@states_d[j], xII)
         )
     ),
 

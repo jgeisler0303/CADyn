@@ -33,8 +33,11 @@ else
     output_str= '-o';
 end
 
-
-mex_file= fullfile(cagem_base, 'src', mex_cpp);
+if isempty(fileparts(mex_cpp))
+    mex_file= fullfile(cagem_base, 'src', mex_cpp);
+else
+    mex_file= mex_cpp;
+end
 
 defines= {['MBSystem=' model_name]};
 if ispc
@@ -48,7 +51,7 @@ defines= strcat('-D', defines);
 
 options= {'-g' output_str mex_name};
 if is_matlab
-    options= [options {'CXXFLAGS="$CXXFLAGS -std=c++11 -Wall -fdiagnostics-show-option"'}];
+    options= [options {'CXXFLAGS="$CXXFLAGS -std=c++17 -Wall -fdiagnostics-show-option"'}];
 end
     
 includes= {
@@ -77,7 +80,7 @@ end
 if ~is_matlab
     old_cxxflags= getenv('CXXFLAGS');
     [~, cxxflags]= system('mkoctfile --print  CXXFLAGS');
-    cxxflags= [cxxflags ' -std=c++11 -Wall -fdiagnostics-show-option '];
+    cxxflags= [cxxflags ' -std=c++17 -Wall -fdiagnostics-show-option '];
     cxxflags= strrep(cxxflags, newline, ' ');
     setenv('CXXFLAGS', cxxflags);
 end

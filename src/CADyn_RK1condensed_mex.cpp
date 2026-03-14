@@ -170,8 +170,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
         
     if(nlhs>out_idx_dx) {
         plhs[out_idx_dx]= mxCreateDoubleMatrix(rk1.nX, 1, mxREAL);
+        ProblemDefinition::VecI dxI = rk1.E * rk1.x.tail(rk1.nII);
         for(int i=0; i<rk1.nI; ++i)
-            mxGetPr(plhs[out_idx_dx])[i]= rk1.E.row(i) * rk1.x.tail(rk1.nII);
+            mxGetPr(plhs[out_idx_dx])[i]= dxI[i];
             
         for(int i=rk1.nI; i<rk1.nX; ++i)
             mxGetPr(plhs[out_idx_dx])[i]= rk1.xdot(i-rk1.nI);

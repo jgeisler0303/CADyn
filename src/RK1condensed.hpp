@@ -249,13 +249,13 @@ typename RK1condensed<problem_class>::step_result RK1condensed<problem_class>::o
         // for x_II, locked states are already considered because xdot is zero for locked states
         x.tail(nII) = x_store.tail(nII) + ha * xdot;
         // compute x_II first because k_II also affects x_I
-        for (int i = 0; i < nI; ++i) {
-            if(locked_states[i])
-                x[i] = x_store[i];
-            else
-                x[i] = x_store[i]  + ha * E.row(i) * x.tail(nII);
+        if constexpr (nI>0) {
+            x.head(nI) = x_store.head(nI) + ha * E * x.tail(nII);
+            for (int i = 0; i < nI; ++i) {
+                if(locked_states[i])
+                    x[i] = x_store[i];
+            }
         }
-
 
         if((iter%jac_recalc_step)==iter_jac) {
             evaluateResidualAndJacobians();
@@ -322,11 +322,12 @@ typename RK1condensed<problem_class>::step_result RK1condensed<problem_class>::o
     t = t_store + h;
     x_last = x_store; // save the state before the step (x_k) for error estimation
     VecII x_II_ha_xdot = x_store.tail(nII) + ha * xdot;
-    for (int i = 0; i < nI; ++i) {
-        if(locked_states[i])
-            x[i] = x_store[i];
-        else
-            x[i] = x_store[i]  + h * E.row(i) * x_II_ha_xdot;
+    if constexpr (nI>0) {
+        x.head(nI) = x_store.head(nI)  + h * E * x_II_ha_xdot;
+        for (int i = 0; i < nI; ++i) {
+            if(locked_states[i])
+                x[i] = x_store[i];
+        }
     }
     x.tail(nII) = x_store.tail(nII) + h * xdot;
 
@@ -382,11 +383,13 @@ typename RK1condensed<problem_class>::real_type RK1condensed<problem_class>::com
     // Method of this solver:      x_I​(t_k​+h) = x_{I,k}​ + h E x_{II,k} ​+ h^2 a ​E k_II
     // Subtract numerical from exact: tau_I = h^2 E (1/2 dot x_{II,k}​ - a k_II) + O(h^3)
     // Substitute dot x_{II,k}​= k_II + O(h): tau_I approx h^2/2 E (1- a/2) dot x_{II,k} = E tau_II 
-    VecI tau_I = err_fac * E * xdot;
-    for (int i = 0; i < nI; ++i) {
-        tau[i] = tau_I[i];
+    if constexpr (nI>0) {
+        VecI tau_I = err_fac * E * xdot;
+        for (int i = 0; i < nI; ++i) {
+            tau[i] = tau_I[i];
+        }
     }
-
+    
     // reconstruct full xdot for scaling the error
     VecX xdot_full;
     xdot_full.tail(nII) = xdot;
@@ -502,30 +505,42 @@ void RK1condensed<problem_class>::sensitivities(real_type h) {
     
     real_type ha= h*rk_a;
     
-    // partial f_II,ev / partial k_II: reused Jacobian from interval/oneStep calculation
-    // partial k_II / partial x_I,k
-    MatII_I Pk_II_Px_Ik= -LU.solve(df_II_dx_I);
+    // partial f_II,ev / partial k_II (aka df_II_dx_II): reused Jacobian from interval/oneStep calculation
     // partial k_II / partial x_II,k
-    MatII Pk_II_Px_IIk= -LU.solve(df_II_dx_II + ha*df_II_dx_I*E);
+    MatII Pk_II_Px_IIk;
+    if constexpr (nI>0)
+        Pk_II_Px_IIk= -LU.solve(df_II_dx_II + ha*df_II_dx_I*E);
+    else
+        Pk_II_Px_IIk= -LU.solve(df_II_dx_II);
+        
     // partial k_II / partial u_k
     MatII_In Pk_II_Pu= -LU.solve(df_II_du);
     
-    // partial x_I,k+1 / partial x_I,k = I + ha*h*E*partial k_II / partial x_I,k
-    fx.block(0, 0, nI, nI)= MatI::Identity() + ha*h*E*Pk_II_Px_Ik;
-    // partial x_I,k+1 / partial x_II,k = h*E + ha*h*E*partial k_II / partial x_II,k
-    fx.block(0, nI, nI, nII)= h*E + ha*h*E*Pk_II_Px_IIk;
-    // partial x_II,k+1 / partial x_I,k = h*partial k_II / partial x_I,k
-    fx.block(nI, 0, nII, nI)= h*Pk_II_Px_Ik;
+    gx = dy_dx;
+
+    if constexpr (nI>0) {
+        // partial k_II / partial x_I,k
+        MatII_I Pk_II_Px_Ik= -LU.solve(df_II_dx_I);
+        
+        // partial x_I,k+1 / partial x_I,k = I + ha*h*E*partial k_II / partial x_I,k
+        fx.block(0, 0, nI, nI)= MatI::Identity() + ha*h*E*Pk_II_Px_Ik;
+        // partial x_I,k+1 / partial x_II,k = h*E + ha*h*E*partial k_II / partial x_II,k
+        fx.block(0, nI, nI, nII)= h*E + ha*h*E*Pk_II_Px_IIk;
+        // partial x_II,k+1 / partial x_I,k = h*partial k_II / partial x_I,k
+        fx.block(nI, 0, nII, nI)= h*Pk_II_Px_Ik;
+        
+        gx.block(0, 0, nOut, nI)+= dy_dxdot*Pk_II_Px_Ik;        
+    }
     // partial x_II,k+1 / partial x_II,k = I + h*partial k_II / partial x_II,k
     fx.block(nI, nI, nII, nII)= MatII::Identity() + h*Pk_II_Px_IIk;
 
-    // partial x_I,k+1 / partial u_k = ha*h*E*partial k_II / partial u_k
-    fu.block(0, 0, nI, nIn)= ha*h*E*Pk_II_Pu;
+    if constexpr (nI>0) {
+        // partial x_I,k+1 / partial u_k = ha*h*E*partial k_II / partial u_k
+        fu.block(0, 0, nI, nIn)= ha*h*E*Pk_II_Pu;
+    }
     // partial x_II,k+1 / partial u_k = h*partial k_II / partial u_k
     fu.block(nI, 0, nII, nIn)= h*Pk_II_Pu;
     
-    gx = dy_dx;
-    gx.block(0, 0, nOut, nI)      += dy_dxdot*Pk_II_Px_Ik;
     gx.block(0, nI, nOut, nII)    += dy_dxdot*Pk_II_Px_IIk;
     gu = dy_du  + dy_dxdot*Pk_II_Pu;
 }
@@ -550,11 +565,14 @@ void RK1condensed<problem_class>::staticEquilibriumWithLin() {
     evaluateOutputJacobian();
     
     // return continuous time linearization
-    fx.block(0, 0, nI, nI).setZero();
-    fx.block(0, nI, nI, nII)= E;
+    if constexpr (nI>0) {
+        fx.block(0, 0, nI, nI).setZero();
+        fx.block(0, nI, nI, nII)= E;
+    }
 
     LU.compute(df_II_dxdot_II);
-    fx.block(nI, 0, nII, nI)= -LU.solve(df_II_dx_I);
+    if constexpr (nI>0) 
+        fx.block(nI, 0, nII, nI)= -LU.solve(df_II_dx_I);
     fx.block(nI, nI, nII, nII)= -LU.solve(df_II_dx_II);
     
     fu.block(0, 0, nI, nIn).setZero();
