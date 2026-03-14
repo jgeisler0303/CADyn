@@ -221,11 +221,8 @@ void <<gentran(literal(eval(filename)))$>>::precalcConsts() {
         
         gentran(literal(cr)),
         genmat(-B, nbrdof, nbrin, nbrdof, 0, "B", 2),
-            
-        gentran(literal(cr)),
-        genmat(C, length(y), 2*nbrdof, 0, 0, "CD", 2),
-        gentran(literal(cr)),
-        genmat(D, length(y), nbrin, 0, 0, "CD.block(0, 2*nbrdof, nbrout, nbrin)", 2),
+                                 
+        /* CD must not be set here. It must be completely written in calcCDF because NewmarkBeta partially overwrites it */
         gentran(literal(cr)),
         genmat(F, length(y), nbrdof, 0, 0, "F", 2)
     )
@@ -444,16 +441,12 @@ void <<gentran(literal(eval(filename)))$>>::calcCDF() {
     ccurrind: 8,
 
     if const_matrix_once=1 then (    
-        C_no_const: matrixmap(lambda([e], if constantp(e) then 0 else e), C),
-        D_no_const: matrixmap(lambda([e], if constantp(e) then 0 else e), D),
         F_no_const: matrixmap(lambda([e], if constantp(e) then 0 else e), F)
     ) else (
-        C_no_const: C,
-        D_no_const: D,
         F_no_const: F
     ),        
     
-    opt: genopt([y, C_no_const, D_no_const, F_no_const]),
+    opt: genopt([y, C, D, F_no_const]),
     gentran(literal(cr)),
     
     for i:1 thru length(y) do (
@@ -462,9 +455,10 @@ void <<gentran(literal(eval(filename)))$>>::calcCDF() {
     ),
     
     gentran(literal(cr)),
-    genmat(opt[2], length(y), 2*nbrdof, 0, 0, "CD", const_matrix_once),
+    gentran(literal("        CD.setZero()\;", cr)),
+    genmat(opt[2], length(y), 2*nbrdof, 0, 0, "CD", 3), /* write only non-zero elements */
     gentran(literal(cr)),
-    genmat(opt[3], length(y), nbrin, 0, 0, "CD.block(0, 2*nbrdof, nbrout, nbrin)", const_matrix_once),
+    genmat(opt[3], length(y), nbrin, 0, 0, "CD.block(0, 2*nbrdof, nbrout, nbrin)", 3),
     gentran(literal(cr)),
     genmat(opt[4], length(y), nbrdof, 0, 0, "F", const_matrix_once)
 )$>>

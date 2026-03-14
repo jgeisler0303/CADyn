@@ -16,7 +16,7 @@ genmat(M, n, m, on, om, name, [varargs]):= block([i, j, i_, j_],
             else
                 M_element: M[on+i, om+j],
                 
-            if with_only_consts=0 or (not(constantp(M_element)) and with_only_consts=1) or (constantp(M_element) and with_only_consts=2) then
+            if with_only_consts=0 or (not(constantp(M_element)) and with_only_consts=1) or (constantp(M_element) and with_only_consts=2) or (M_element#0 and with_only_consts=3) then
                 do_assign(concat(name, "(", i_, ", ", j_, ")"), M_element)
         )
     )    
